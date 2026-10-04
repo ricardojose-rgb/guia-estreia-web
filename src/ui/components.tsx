@@ -1,5 +1,5 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { Check, Plus, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Check, ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
 import { largeImage } from "../data/api";
 import { dismissToast, useStore } from "../data/store";
 import type { Scores } from "../data/types";
@@ -184,11 +184,32 @@ export interface CarouselItem {
 }
 
 export function Carousel({ title, items }: { title: string; items: CarouselItem[] }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState({ start: true, end: false });
+  const update = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    setEdges({ start: el.scrollLeft <= 4, end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 4 });
+  }, []);
+  useEffect(() => {
+    update();
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [update, items.length]);
+  const page = (dir: 1 | -1) => {
+    const el = ref.current;
+    if (el) el.scrollBy({ left: dir * el.clientWidth * 0.85, behavior: "smooth" });
+  };
   if (!items.length) return null;
   return (
-    <section>
+    <section className={`carousel-wrap${edges.end ? " at-end" : ""}`}>
       <h2 className="h2">{title}</h2>
-      <div className="carousel">
+      {!edges.start && <button className="car-arrow left" aria-label="Anterior" onClick={() => page(-1)}><ChevronLeft size={24} /></button>}
+      {!edges.end && <button className="car-arrow right" aria-label="Seguinte" onClick={() => page(1)}><ChevronRight size={24} /></button>}
+      <div className="carousel" ref={ref} onScroll={update}>
         {items.map((it) => {
           const inner = (
             <>
