@@ -351,7 +351,7 @@ export function largeImage(url?: string | null): string | null {
 
 type MdbRating = { source?: string; value?: number | null; score?: number | null; votes?: number | string | null };
 
-const ORDER = ["imdb", "tomatoes", "popcorn", "metacritic", "tmdb", "letterboxd", "trakt", "myanimelist"];
+const ORDER = ["imdb", "tomatoes", "popcorn", "metacritic", "tmdb", "letterboxd", "myanimelist"];
 
 function mdbItems(ratings: MdbRating[]): ScoreItem[] {
   const out: ScoreItem[] = [];

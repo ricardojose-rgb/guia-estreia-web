@@ -156,7 +156,7 @@ export function ScoreChips({ scores, title }: { scores: Scores | null | undefine
   if (scores.all?.length) {
     return (
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        {scores.all.map((it) => <ScoreItemChip key={it.source} it={it} imdbId={scores.imdbId} rtQuery={title} />)}
+        {scores.all.filter((it) => it.source !== "trakt").map((it) => <ScoreItemChip key={it.source} it={it} imdbId={scores.imdbId} rtQuery={title} />)}
       </div>
     );
   }
