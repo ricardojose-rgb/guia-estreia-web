@@ -67,6 +67,17 @@ function Page({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
+function SyncBadge() {
+  const sync = useStore((s) => s.sync);
+  const label = !sync.token ? "Sincronização desligada" : sync.status === "syncing" ? "A sincronizar…" : sync.status === "error" ? "Erro na sincronização" : "Sincronizado";
+  const color = !sync.token ? "var(--muted)" : sync.status === "error" ? "var(--film)" : "var(--new)";
+  return (
+    <NavLink to="/definicoes" className="nav-item" style={{ fontSize: 13, fontWeight: 700 }} title={sync.error ?? label}>
+      <span style={{ width: 8, height: 8, borderRadius: 99, background: color, marginLeft: 6, marginRight: 6 }} />{label}
+    </NavLink>
+  );
+}
+
 function Shell() {
   const loc = useLocation();
   const isShow = loc.pathname.startsWith("/serie/");
@@ -80,6 +91,7 @@ function Shell() {
           </NavLink>
         ))}
         <div className="spacer" />
+        <SyncBadge />
         <NavLink to="/definicoes" className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}><Cog size={20} />Definições</NavLink>
       </aside>
       <main className="main">

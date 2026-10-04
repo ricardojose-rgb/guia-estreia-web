@@ -3,14 +3,28 @@ import { del as idbDel, get as idbGet, set as idbSet } from "idb-keyval";
 import type { AniMedia, Backup, Episode, Prefs, Show, TmEpisode, TmShow, WatchedEntry } from "./types";
 import { channelOf, findAnimeShow, friendlyError, TvMaze } from "./api";
 import { usToday } from "./dates";
+import { canonical, emptyDoc, merge, parseDoc, type SyncDoc } from "./syncDoc";
+import { findOrCreateGist, GistError, readGist, whoAmI, writeGist } from "./gist";
 
 export interface Toast { id: number; text: string; actionLabel?: string; action?: () => void }
+
+export interface SyncState {
+  token: string;
+  gistId: string;
+  login: string;
+  lastSync: number;
+  status: "off" | "syncing" | "ok" | "error";
+  error: string | null;
+}
 
 interface State {
   shows: Record<number, Show>;
   episodes: Record<number, Episode[]>;
   watched: Record<number, WatchedEntry>;
   animeLinks: Record<number, number>; // id AniList -> id TVmaze
+  removed: Record<number, number>; // série -> quando deixou de ser seguida
+  unwatched: Record<number, number>; // episódio -> quando foi desmarcado
+  sync: SyncState;
   prefs: Prefs;
   pending: Record<string, true>;
   refreshing: boolean;
@@ -33,6 +47,9 @@ let state: State = {
   episodes: {},
   watched: saved.watched ?? {},
   animeLinks: saved.animeLinks ?? {},
+  removed: saved.removed ?? {},
+  unwatched: saved.unwatched ?? {},
+  sync: { token: "", gistId: "", login: "", lastSync: 0, ...(saved.sync ?? {}), status: saved.sync?.token ? "ok" : "off", error: null },
   prefs: { tmdbToken: "", omdbKey: "", hideSpoilers: false, ...(saved.prefs ?? {}) },
   pending: {},
   refreshing: false,
@@ -44,16 +61,21 @@ const listeners = new Set<() => void>();
 
 function persist() {
   try {
-    const { shows, watched, animeLinks, prefs } = state;
-    localStorage.setItem(LS, JSON.stringify({ shows, watched, animeLinks, prefs }));
+    const { shows, watched, animeLinks, prefs, removed, unwatched } = state;
+    const { token, gistId, login, lastSync } = state.sync;
+    localStorage.setItem(LS, JSON.stringify({ shows, watched, animeLinks, prefs, removed, unwatched, sync: { token, gistId, login, lastSync } }));
   } catch { /* armazenamento cheio ou bloqueado: continua em memória */ }
 }
+
+let applyingRemote = false;
 
 function setState(patch: Partial<State> | ((s: State) => Partial<State>), save = true) {
   const p = typeof patch === "function" ? patch(state) : patch;
   state = { ...state, ...p };
   if (save) persist();
   listeners.forEach((l) => l());
+  // Qualquer mudança aos dados sincronizados agenda uma sincronização
+  if (save && !applyingRemote && ("shows" in p || "watched" in p || "removed" in p || "unwatched" in p || "animeLinks" in p)) scheduleSync();
 }
 
 export function useStore<T>(sel: (s: State) => T): T {
@@ -79,6 +101,11 @@ export const dismissToast = () => setState({ toast: null }, false);
     if (eps) loaded[id] = eps;
   }));
   setState({ episodes: loaded, ready: true }, false);
+  if (state.sync.token) syncNow();
+  // Sincroniza ao voltar à janela e a cada 5 minutos
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") syncNow(); });
+  window.addEventListener("focus", () => syncNow());
+  setInterval(() => { if (document.visibilityState === "visible") syncNow(); }, 5 * 60_000);
   // Atualiza em segundo plano se a última atualização tiver mais de 6 horas
   const last = Number(localStorage.getItem("guia:lastRefresh") || 0);
   if (ids.length && Date.now() - last > 6 * 3600_000) refreshAll(true);
@@ -121,7 +148,7 @@ export async function follow(show: TmShow) {
   const key = `t${show.id}`;
   setPending(key, true);
   try {
-    setState((s) => ({ shows: { ...s.shows, [show.id]: toShow(show) } }));
+    setState((s) => ({ shows: { ...s.shows, [show.id]: toShow(show) }, removed: without(s.removed, show.id) }));
     await refreshShow(show.id).catch(() => {});
     say(`✓ A seguir ${show.name}`);
   } finally { setPending(key, false); }
@@ -133,7 +160,7 @@ export async function followById(id: number, name: string) {
   setPending(key, true);
   try {
     const s = await TvMaze.show(id);
-    setState((st) => ({ shows: { ...st.shows, [id]: toShow(s) } }));
+    setState((st) => ({ shows: { ...st.shows, [id]: toShow(s) }, removed: without(st.removed, id) }));
     await refreshShow(id).catch(() => {});
     say(`✓ A seguir ${name}`);
   } catch (e) { say(friendlyError(e)); }
@@ -147,7 +174,7 @@ export async function followAnime(m: AniMedia, title: string) {
   try {
     const show = await findAnimeShow(m);
     if (!show) { say(`Não encontrei "${title}" no guia de episódios. Experimenta procurá-lo em Séries.`); return; }
-    setState((s) => ({ shows: { ...s.shows, [show.id]: toShow(show) }, animeLinks: { ...s.animeLinks, [m.id]: show.id } }));
+    setState((s) => ({ shows: { ...s.shows, [show.id]: toShow(show) }, animeLinks: { ...s.animeLinks, [m.id]: show.id }, removed: without(s.removed, show.id) }));
     await refreshShow(show.id).catch(() => {});
     say(`✓ A seguir ${show.name}`);
   } catch (e) { say(friendlyError(e)); }
@@ -156,11 +183,11 @@ export async function followAnime(m: AniMedia, title: string) {
 
 export function unfollow(id: number) {
   const name = state.shows[id]?.name ?? "a série";
+  // Os episódios vistos ficam guardados: se voltares a seguir a série, o progresso volta
   setState((s) => {
     const shows = { ...s.shows }; delete shows[id];
     const episodes = { ...s.episodes }; delete episodes[id];
-    const watched = Object.fromEntries(Object.entries(s.watched).filter(([, w]) => w.showId !== id));
-    return { shows, episodes, watched };
+    return { shows, episodes, removed: { ...s.removed, [id]: Date.now() } };
   });
   idbDel(`eps:${id}`).catch(() => {});
   say(`Deixaste de seguir ${name}`);
@@ -186,8 +213,13 @@ export function setWatched(showId: number, ids: number[], on: boolean) {
   if (!ids.length) return;
   setState((s) => {
     const w = { ...s.watched };
-    for (const id of ids) { if (on) w[id] = { showId, watchedAt: Date.now() }; else delete w[id]; }
-    return { watched: w };
+    const u = { ...s.unwatched };
+    const now = Date.now();
+    for (const id of ids) {
+      if (on) { w[id] = { showId, watchedAt: now }; delete u[id]; }
+      else { delete w[id]; u[id] = now; }
+    }
+    return { watched: w, unwatched: u };
   });
 }
 
@@ -260,4 +292,115 @@ export async function importBackup(text: string): Promise<number> {
     });
   } finally { setState({ refreshing: false }, false); }
   return ok;
+}
+
+const without = <T,>(o: Record<number, T>, id: number) => { const c = { ...o }; delete c[id]; return c; };
+
+// ---------- sincronização (GitHub Gist) ----------
+
+function toDoc(s: State): SyncDoc {
+  const d = emptyDoc();
+  d.updatedAt = Date.now();
+  for (const sh of Object.values(s.shows)) d.shows[sh.id] = { name: sh.name, addedAt: sh.addedAt };
+  for (const [id, at] of Object.entries(s.removed)) d.removed[id] = at;
+  for (const [id, w] of Object.entries(s.watched)) d.watched[id] = [w.showId, w.watchedAt];
+  for (const [id, at] of Object.entries(s.unwatched)) d.unwatched[id] = at;
+  for (const [id, tv] of Object.entries(s.animeLinks)) d.animeLinks[id] = tv;
+  d.keys = { tmdb: s.prefs.tmdbToken || null, omdb: s.prefs.omdbKey || null };
+  return d;
+}
+
+/** Aplica o documento junto ao estado local; devolve as séries novas que é preciso carregar. */
+function applyDoc(d: SyncDoc): number[] {
+  const toLoad: number[] = [];
+  applyingRemote = true;
+  try {
+    setState((s) => {
+      const shows: Record<number, Show> = {};
+      for (const [id, info] of Object.entries(d.shows)) {
+        const n = Number(id);
+        const local = s.shows[n];
+        if (local) shows[n] = { ...local, addedAt: info.addedAt };
+        else { shows[n] = { id: n, name: info.name, addedAt: info.addedAt }; toLoad.push(n); }
+      }
+      const episodes = { ...s.episodes };
+      for (const id of Object.keys(s.shows)) if (!shows[Number(id)]) delete episodes[Number(id)];
+      const watched: Record<number, WatchedEntry> = {};
+      for (const [id, [showId, at]] of Object.entries(d.watched)) watched[Number(id)] = { showId, watchedAt: at };
+      return {
+        shows, episodes, watched,
+        removed: Object.fromEntries(Object.entries(d.removed).map(([k, v]) => [Number(k), v])),
+        unwatched: Object.fromEntries(Object.entries(d.unwatched).map(([k, v]) => [Number(k), v])),
+        animeLinks: Object.fromEntries(Object.entries(d.animeLinks).map(([k, v]) => [Number(k), v])),
+        prefs: { ...s.prefs, tmdbToken: s.prefs.tmdbToken || d.keys.tmdb || "", omdbKey: s.prefs.omdbKey || d.keys.omdb || "" },
+      };
+    });
+  } finally { applyingRemote = false; }
+  return toLoad;
+}
+
+let syncTimer: ReturnType<typeof setTimeout> | null = null;
+let syncing: Promise<void> | null = null;
+let again = false;
+
+function scheduleSync() {
+  if (!state.sync.token) return;
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => { syncTimer = null; syncNow(); }, 2500);
+}
+
+function setSync(p: Partial<SyncState>) {
+  setState((s) => ({ sync: { ...s.sync, ...p } }), "token" in p || "gistId" in p || "lastSync" in p || "login" in p);
+}
+
+/** Junta o que está no GitHub com o que está aqui e grava o resultado nos dois lados. */
+export function syncNow(): Promise<void> {
+  if (!state.sync.token || !state.ready) return Promise.resolve();
+  if (syncing) { again = true; return syncing; }
+  syncing = (async () => {
+    const { token } = state.sync;
+    setSync({ status: "syncing", error: null });
+    try {
+      let gistId = state.sync.gistId;
+      if (!gistId) { gistId = await findOrCreateGist(token, canonical(toDoc(state))); setSync({ gistId }); }
+      const remoteText = await readGist(token, gistId);
+      const remote = parseDoc(remoteText);
+      const merged = merge(toDoc(state), remote);
+      const toLoad = applyDoc(merged);
+      if (canonical(merged) !== canonical(remote)) await writeGist(token, gistId, JSON.stringify({ ...merged, updatedAt: Date.now() }));
+      setSync({ status: "ok", lastSync: Date.now(), error: null });
+      // Séries que vieram do outro aparelho: carregar dados e episódios
+      for (const id of toLoad) {
+        try {
+          const show = await TvMaze.show(id);
+          applyingRemote = true;
+          try { setState((s) => (s.shows[id] ? { shows: { ...s.shows, [id]: toShow(show, s.shows[id].addedAt) } } : {}), true); }
+          finally { applyingRemote = false; }
+          await refreshShow(id);
+        } catch { /* tenta outra vez na próxima atualização */ }
+      }
+    } catch (e) {
+      const msg = e instanceof GistError ? e.message : "Sem ligação ao GitHub. Volta a tentar quando tiveres internet.";
+      setSync({ status: "error", error: msg });
+      if (e instanceof GistError && e.status === 404) setSync({ gistId: "" });
+    } finally {
+      syncing = null;
+      if (again) { again = false; scheduleSync(); }
+    }
+  })();
+  return syncing;
+}
+
+/** Liga a sincronização com uma chave do GitHub. */
+export async function connectSync(token: string): Promise<string> {
+  const t = token.trim();
+  const login = await whoAmI(t);
+  setSync({ token: t, login, gistId: "", status: "syncing", error: null });
+  await syncNow();
+  if (state.sync.status === "error") throw new Error(state.sync.error ?? "Erro");
+  return login;
+}
+
+export function disconnectSync() {
+  setSync({ token: "", gistId: "", login: "", lastSync: 0, status: "off", error: null });
 }

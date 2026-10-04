@@ -1,5 +1,67 @@
 import { useRef, useState } from "react";
-import { exportBackup, importBackup, setPrefs, useStore } from "../data/store";
+import { connectSync, disconnectSync, exportBackup, importBackup, setPrefs, syncNow, useStore } from "../data/store";
+import { TOKEN_URL } from "../data/gist";
+import { ExternalLink, RefreshCw } from "lucide-react";
+
+function ago(t: number): string {
+  if (!t) return "nunca";
+  const s = Math.round((Date.now() - t) / 1000);
+  if (s < 60) return "agora mesmo";
+  if (s < 3600) return `há ${Math.round(s / 60)} min`;
+  return new Intl.DateTimeFormat("pt-PT", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(t);
+}
+
+function SyncCard() {
+  const sync = useStore((s) => s.sync);
+  const [token, setToken] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const connected = !!sync.token;
+
+  const connect = async () => {
+    setBusy(true); setErr(null);
+    try { await connectSync(token); setToken(""); }
+    catch (e) { setErr(e instanceof Error ? e.message : "Não foi possível ligar."); disconnectSync(); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="card setting" id="sincronizar">
+      <h3>Sincronização entre aparelhos</h3>
+      {connected ? (
+        <>
+          <p className="small muted" style={{ margin: 0 }}>
+            Ligado à conta do GitHub <b style={{ color: "var(--fg)" }}>{sync.login}</b>. As séries, os episódios vistos e as chaves ficam iguais aqui e no telemóvel.
+          </p>
+          <div className="line" style={{ flexWrap: "wrap" }}>
+            <span className="small" style={{ flex: 1, color: sync.status === "error" ? "var(--film)" : "var(--muted)" }}>
+              {sync.status === "syncing" ? "A sincronizar…" : sync.status === "error" ? sync.error : `Sincronizado ${ago(sync.lastSync)}`}
+            </span>
+            <button className="btn tonal" disabled={sync.status === "syncing"} onClick={() => syncNow()}><RefreshCw size={16} />Sincronizar agora</button>
+            <button className="btn ghost" onClick={disconnectSync}>Desligar</button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="small muted" style={{ margin: 0 }}>
+            Guarda as tuas séries num ficheiro secreto na tua conta do GitHub, para ficarem iguais no telemóvel e no computador. Só é preciso fazer isto uma vez em cada aparelho.
+          </p>
+          <ol className="small" style={{ margin: 0, paddingLeft: 20, display: "grid", gap: 4 }}>
+            <li>Abre <a className="primary-text" href={TOKEN_URL} target="_blank" rel="noopener" style={{ fontWeight: 800 }}>esta página do GitHub <ExternalLink size={12} style={{ verticalAlign: -1 }} /></a>. A opção <b>gist</b> já vem marcada.</li>
+            <li>Em <b>Expiration</b>, escolhe <b>No expiration</b> e carrega em <b>Generate token</b> no fim da página.</li>
+            <li>Copia o código que começa por <b>ghp_</b> e cola-o aqui. Usa o mesmo código na app do telemóvel.</li>
+          </ol>
+          <div className="line" style={{ flexWrap: "wrap" }}>
+            <input className="field" style={{ flex: "1 1 260px" }} type="password" placeholder="ghp_…" aria-label="Chave do GitHub" autoComplete="off"
+              value={token} onChange={(e) => setToken(e.target.value)} />
+            <button className="btn filled" disabled={busy || token.trim().length < 20} onClick={connect}>{busy ? "A ligar…" : "Ligar"}</button>
+          </div>
+          {err && <p className="small" style={{ margin: 0, color: "var(--film)" }}>{err}</p>}
+        </>
+      )}
+    </div>
+  );
+}
 
 function KeyField({ label, value, onSave, placeholder }: { label: string; value: string; onSave: (v: string) => void; placeholder: string }) {
   const [v, setV] = useState(value);
@@ -41,11 +103,11 @@ export default function Settings() {
 
   return (
     <div className="settings">
+      <SyncCard />
       <div className="card setting">
-        <h3>Passar as séries do telemóvel para aqui</h3>
+        <h3>Cópia de segurança</h3>
         <p className="small muted" style={{ margin: 0 }}>
-          Na app do telemóvel, abre Definições → Cópia de segurança → Exportar e envia o ficheiro para o computador (por email, Google Drive ou AirDrop). Depois carrega em Importar aqui. As chaves do TMDB e do OMDb vêm incluídas.
-          O mesmo ficheiro funciona no sentido contrário.
+          Guarda tudo num ficheiro, ou importa o ficheiro exportado na app do telemóvel. Com a sincronização ligada não precisas disto.
         </p>
         <div className="line">
           <button className="btn tonal" onClick={doExport}>Exportar</button>
