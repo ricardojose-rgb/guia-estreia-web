@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Check, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 import type { Episode, Scores, TmShow } from "../data/types";
-import { channelOf, friendlyError, showScores, TvMaze } from "../data/api";
+import { channelOf, friendlyError, scoresForShow, TvMaze } from "../data/api";
 import { catchUp, follow, markWatched, setWatched, toEpisodes, unfollow, useStore } from "../data/store";
 import { episodeCode, episodeTitle, ptAirTime, relativeDay, shortDate, statusPt, stripHtml, usToday } from "../data/dates";
 import { Empty, Poster, ScoreChips, Spinner } from "../ui/components";
@@ -15,6 +15,7 @@ export default function ShowPage() {
   const watched = useStore((s) => s.watched);
   const hide = useStore((s) => s.prefs.hideSpoilers);
   const omdb = useStore((s) => s.prefs.omdbKey);
+  const mdb = useStore((s) => s.prefs.mdblistKey);
   const pending = useStore((s) => !!s.pending[`t${id}`]);
   const [show, setShow] = useState<TmShow | null>(null);
   const [remote, setRemote] = useState<Episode[] | null>(null);
@@ -30,12 +31,12 @@ export default function ShowPage() {
       if (!alive) return;
       setShow(s);
       setScores({ imdbId: s.externals?.imdb, tvmaze: s.rating?.average });
-      showScores(omdb, s.externals?.imdb, s.rating?.average).then((sc) => alive && setScores(sc));
+      scoresForShow({ omdbKey: omdb, mdblistKey: mdb }, s.externals?.imdb, s.rating?.average).then((sc) => alive && setScores(sc));
     }, (e) => alive && setError(e));
     TvMaze.episodes(id).then((e) => alive && setRemote(toEpisodes(id, e)), () => {});
     window.scrollTo(0, 0);
     return () => { alive = false; };
-  }, [id, omdb]);
+  }, [id, omdb, mdb]);
 
   const episodes = followed && localEps?.length ? localEps : remote ?? [];
   const seasons = useMemo(() => {
@@ -65,7 +66,7 @@ export default function ShowPage() {
             <h1>{show.name}</h1>
             <span className="muted">{[show.premiered?.slice(0, 4), channelOf(show), statusPt(show.status)].filter(Boolean).join(" · ")}</span>
             {!!show.genres?.length && <span className="muted small">{show.genres.join(", ")}</span>}
-            <ScoreChips scores={scores} />
+            <ScoreChips scores={scores} title={show.name} />
             {next && (
               <span className="primary-text" style={{ fontWeight: 800 }}>
                 Próximo: {episodeCode(next.season, next.number)} · {relativeDay(next.airdate!, today)} (EUA)

@@ -1,5 +1,5 @@
 import { get as idbGet, set as idbSet } from "idb-keyval";
-import type { AniMedia, AnimeEpisode, Anticipated, Premiere, Scores, TmdbMovie, TmEpisode, TmShow } from "./types";
+import type { AniMedia, AnimeEpisode, Anticipated, Premiere, ScoreItem, Scores, TmdbMovie, TmEpisode, TmShow } from "./types";
 import { addDays, seasonOf, usToday } from "./dates";
 
 export class HttpError extends Error {
@@ -344,4 +344,94 @@ export async function movieScores(key: string, m: TmdbMovie): Promise<Scores> {
 export function largeImage(url?: string | null): string | null {
   if (!url) return null;
   return url.replace("/medium_portrait/", "/original_untouched/").replace(/\/t\/p\/w\d+\//, "/t/p/original/");
+}
+
+// ---------------- MDBList (todas as pontuações: IMDb, Rotten Tomatoes, Metacritic, TMDB…) ----------------
+// GET https://api.mdblist.com/{imdb|tmdb}/{movie|show}/{id}?apikey=…  →  { ratings: [{ source, value, score, votes }] }
+
+type MdbRating = { source?: string; value?: number | null; score?: number | null; votes?: number | string | null };
+
+const ORDER = ["imdb", "tomatoes", "popcorn", "metacritic", "tmdb", "letterboxd", "trakt", "myanimelist"];
+
+function mdbItems(ratings: MdbRating[]): ScoreItem[] {
+  const out: ScoreItem[] = [];
+  for (const src of ORDER) {
+    const r = ratings.find((x) => (x.source === src || (src === "popcorn" && x.source === "tomatoesaudience")) && (x.value ?? x.score ?? 0) > 0);
+    if (!r) continue;
+    const v = r.value ?? null, sc = r.score ?? null;
+    const votes = r.votes == null ? null : Number(r.votes) || null;
+    const one = (n: number) => n.toFixed(1).replace(".", ",");
+    let text: string, pct: number;
+    switch (src) {
+      case "imdb": case "myanimelist": text = one(v ?? (sc ?? 0) / 10); pct = sc ?? (v ?? 0) * 10; break;
+      case "letterboxd": text = one(v ?? (sc ?? 0) / 20); pct = sc ?? (v ?? 0) * 20; break;
+      case "metacritic": text = String(Math.round(v ?? sc ?? 0)); pct = v ?? sc ?? 0; break;
+      default: { const p = Math.round(src === "tmdb" || src === "trakt" ? (sc ?? (v ?? 0) * (v != null && v <= 10 ? 10 : 1)) : (v ?? sc ?? 0)); text = `${p}%`; pct = p; }
+    }
+    out.push({ source: src, text, pct, votes });
+  }
+  return out;
+}
+
+export function normalizeMdbKey(text: string): string {
+  const t = text.trim();
+  const m = t.match(/apikey=([A-Za-z0-9]+)/i);
+  return (m ? m[1] : t).replace(/[^A-Za-z0-9]/g, "");
+}
+
+async function mdbGet(key: string, provider: "imdb" | "tmdb", type: "movie" | "show", id: string | number): Promise<{ status: number; body: any }> {
+  const res = await fetch(`https://api.mdblist.com/${provider}/${type}/${encodeURIComponent(String(id))}?apikey=${encodeURIComponent(normalizeMdbKey(key))}`);
+  const body = await res.json().catch(() => null);
+  return { status: res.status, body };
+}
+
+function mdbErrorPt(status: number, body: any): string {
+  const e = String(body?.error ?? body?.message ?? "").toLowerCase();
+  if (status === 429 || e.includes("limit")) return "Chegaste ao limite diário do MDBList (1000 pedidos). Volta a funcionar amanhã.";
+  if (status === 401 || status === 403 || e.includes("key")) return "A chave do MDBList não é válida. Copia-a outra vez em mdblist.com → Preferences.";
+  return `O MDBList respondeu com um erro (${status}). Tenta outra vez daqui a pouco.`;
+}
+
+export async function testMdbKey(key: string): Promise<{ ok: boolean; message: string }> {
+  try {
+    const r = await mdbGet(key, "imdb", "show", "tt0944947");
+    const items = r.status === 200 ? mdbItems(r.body?.ratings ?? []) : [];
+    if (items.length) {
+      const imdb = items.find((i) => i.source === "imdb")?.text, rt = items.find((i) => i.source === "tomatoes")?.text;
+      return { ok: true, message: `Chave válida ✓ (Game of Thrones: IMDb ${imdb ?? "—"} · Rotten Tomatoes ${rt ?? "—"})` };
+    }
+    return { ok: false, message: mdbErrorPt(r.status, r.body) };
+  } catch {
+    return { ok: false, message: "O browser não conseguiu contactar o MDBList. Verifica a internet; se continuar, as pontuações aparecem na app do telemóvel." };
+  }
+}
+
+async function mdbScores(key: string, provider: "imdb" | "tmdb", type: "movie" | "show", id: string | number): Promise<ScoreItem[] | null> {
+  const ck = `mdb:${provider}:${type}:${id}`;
+  const hit = await idbGet<{ at: number; value: ScoreItem[] }>(ck).catch(() => undefined);
+  if (hit && Date.now() - hit.at < 7 * 86400_000) return hit.value;
+  const r = await mdbGet(key, provider, type, id);
+  if (r.status === 404) { idbSet(ck, { at: Date.now(), value: [] }).catch(() => {}); return []; }
+  if (r.status !== 200) return null;
+  const items = mdbItems(r.body?.ratings ?? []);
+  idbSet(ck, { at: Date.now(), value: items }).catch(() => {});
+  return items;
+}
+
+/** Pontuações de uma série: MDBList se houver chave, senão OMDb, senão TVmaze. */
+export async function scoresForShow(prefs: { mdblistKey: string; omdbKey: string }, imdbId: string | null | undefined, tvmaze?: number | null): Promise<Scores> {
+  if (prefs.mdblistKey && imdbId) {
+    const all = await mdbScores(prefs.mdblistKey, "imdb", "show", imdbId).catch(() => null);
+    if (all?.length) return { all, imdbId, tvmaze };
+  }
+  return showScores(prefs.omdbKey, imdbId, tvmaze);
+}
+
+/** Pontuações de um filme: MDBList (pelo id do TMDB) se houver chave, senão OMDb. */
+export async function scoresForMovie(prefs: { mdblistKey: string; omdbKey: string }, m: TmdbMovie): Promise<Scores> {
+  if (prefs.mdblistKey) {
+    const all = await mdbScores(prefs.mdblistKey, "tmdb", "movie", m.id).catch(() => null);
+    if (all?.length) return { all };
+  }
+  return movieScores(prefs.omdbKey, m);
 }

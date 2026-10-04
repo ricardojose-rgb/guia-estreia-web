@@ -124,8 +124,42 @@ export function Empty({ title, body, action }: { title: string; body: string; ac
 
 export const Spinner = () => <div className="center"><span className="spinner" /></div>;
 
-export function ScoreChips({ scores }: { scores: Scores | null | undefined }) {
+const SCORE_META: Record<string, { label: string; title: string }> = {
+  imdb: { label: "IMDb", title: "IMDb" },
+  tomatoes: { label: "", title: "Rotten Tomatoes (críticos)" },
+  popcorn: { label: "", title: "Rotten Tomatoes (público)" },
+  metacritic: { label: "Metacritic", title: "Metacritic" },
+  tmdb: { label: "TMDB", title: "TMDB" },
+  letterboxd: { label: "Letterboxd", title: "Letterboxd" },
+  trakt: { label: "Trakt", title: "Trakt" },
+  myanimelist: { label: "MAL", title: "MyAnimeList" },
+};
+
+function ScoreItemChip({ it, imdbId, rtQuery }: { it: import("../data/types").ScoreItem; imdbId?: string | null; rtQuery?: string }) {
+  const meta = SCORE_META[it.source] ?? { label: it.source, title: it.source };
+  const votes = it.votes ? ` · ${it.votes.toLocaleString("pt-PT")} votos` : "";
+  let cls = "score tm", icon = "";
+  if (it.source === "imdb") cls = "score imdb";
+  else if (it.source === "tomatoes") { cls = `score rt ${it.pct >= 60 ? "fresh" : "rotten"}`; icon = "🍅"; }
+  else if (it.source === "popcorn") { cls = `score pop ${it.pct >= 60 ? "fresh" : "rotten"}`; icon = "🍿"; }
+  else if (it.source === "metacritic") cls = `score mc ${it.pct >= 61 ? "good" : it.pct >= 40 ? "mixed" : "bad"}`;
+  const href = it.source === "imdb" && imdbId ? `https://www.imdb.com/title/${imdbId}/`
+    : (it.source === "tomatoes" || it.source === "popcorn") && rtQuery ? `https://www.rottentomatoes.com/search?search=${encodeURIComponent(rtQuery)}` : undefined;
+  const inner = <>{icon && <span aria-hidden="true">{icon}</span>}{meta.label && <small>{meta.label.toUpperCase()}</small>}{it.text}</>;
+  return href
+    ? <a className={cls} href={href} target="_blank" rel="noopener" title={meta.title + votes}>{inner}</a>
+    : <span className={cls} title={meta.title + votes}>{inner}</span>;
+}
+
+export function ScoreChips({ scores, title }: { scores: Scores | null | undefined; title?: string }) {
   if (!scores) return null;
+  if (scores.all?.length) {
+    return (
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {scores.all.map((it) => <ScoreItemChip key={it.source} it={it} imdbId={scores.imdbId} rtQuery={title} />)}
+      </div>
+    );
+  }
   return (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
       {scores.imdb && (
@@ -133,7 +167,7 @@ export function ScoreChips({ scores }: { scores: Scores | null | undefined }) {
           <small>IMDB</small>{scores.imdb}/10
         </a>
       )}
-      {scores.rottenTomatoes && <span className="score rt"><small>ROTTEN TOMATOES</small>{scores.rottenTomatoes}</span>}
+      {scores.rottenTomatoes && <span className="score rt fresh"><span aria-hidden="true">🍅</span>{scores.rottenTomatoes}</span>}
       {!scores.imdb && scores.tvmaze != null && <span className="score tm"><small>TVMAZE</small>{scores.tvmaze.toFixed(1).replace(".", ",")}/10</span>}
     </div>
   );

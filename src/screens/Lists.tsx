@@ -2,7 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import type { AniMedia, AnimeEpisode, Premiere, TmdbMovie } from "../data/types";
 import {
-  aniTitle, animeSchedule, animeSeason, animeUpcoming, anticipatedMovies, friendlyError, movieScores, premieres, tmdbPoster, upcomingMovies,
+  aniTitle, animeSchedule, animeSeason, animeUpcoming, anticipatedMovies, friendlyError, scoresForMovie, premieres, tmdbPoster, upcomingMovies,
 } from "../data/api";
 import { followAnime, followById, setWatched, markWatched, useStore } from "../data/store";
 import { agendaEpisodes, type AgendaEpisode } from "../data/selectors";
@@ -229,6 +229,7 @@ function dateLabel(m: AniMedia): string | null {
 export function MoviesList({ withAnticipated = false }: { withAnticipated?: boolean }) {
   const token = useStore((s) => s.prefs.tmdbToken);
   const omdb = useStore((s) => s.prefs.omdbKey);
+  const mdb = useStore((s) => s.prefs.mdblistKey);
   const nav = useNavigate();
   const movies = useAsync(() => (token ? upcomingMovies(token) : Promise.resolve([] as TmdbMovie[])), [token]);
   const ant = useAsync(() => (token && withAnticipated ? anticipatedMovies(token) : Promise.resolve([] as TmdbMovie[])), [token, withAnticipated]);
@@ -258,7 +259,7 @@ export function MoviesList({ withAnticipated = false }: { withAnticipated?: bool
       {groups.map(([date, items]) => (
         <Fragment key={date}>
           <DayHeader date={date} today={today} />
-          <div className="rows two">{items.map((m) => <MovieRow key={m.id} m={m} omdb={omdb} />)}</div>
+          <div className="rows two">{items.map((m) => <MovieRow key={m.id} m={m} omdb={omdb} mdb={mdb} />)}</div>
         </Fragment>
       ))}
       {movies.data && <p className="small muted" style={{ marginTop: 28 }}>Dados de filmes: TMDB. Este produto usa a API do TMDB mas não é endossado nem certificado pelo TMDB.</p>}
@@ -266,16 +267,16 @@ export function MoviesList({ withAnticipated = false }: { withAnticipated?: bool
   );
 }
 
-function MovieRow({ m, omdb }: { m: TmdbMovie; omdb: string }) {
-  const [scores, setScores] = useState<Awaited<ReturnType<typeof movieScores>> | null>(null);
-  useEffect(() => { let alive = true; movieScores(omdb, m).then((s) => alive && setScores(s)); return () => { alive = false; }; }, [m.id, omdb]);
+function MovieRow({ m, omdb, mdb }: { m: TmdbMovie; omdb: string; mdb: string }) {
+  const [scores, setScores] = useState<Awaited<ReturnType<typeof scoresForMovie>> | null>(null);
+  useEffect(() => { let alive = true; scoresForMovie({ omdbKey: omdb, mdblistKey: mdb }, m).then((s) => alive && setScores(s)); return () => { alive = false; }; }, [m.id, omdb, mdb]);
   return (
     <div className="row">
       <Poster src={tmdbPoster(m.poster_path, "w185")} large={tmdbPoster(m.poster_path, "original")} title={m.title} width={52} />
       <a className="body" href={`https://www.themoviedb.org/movie/${m.id}`} target="_blank" rel="noopener">
         <span><Tag kind="film">Filme</Tag></span>
         <span className="title clamp2">{m.title}</span>
-        <ScoreChips scores={scores} />
+        <ScoreChips scores={scores} title={m.title} />
         {m.overview && <span className="small muted clamp2">{m.overview}</span>}
       </a>
     </div>

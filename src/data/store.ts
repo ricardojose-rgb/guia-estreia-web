@@ -50,7 +50,7 @@ let state: State = {
   removed: saved.removed ?? {},
   unwatched: saved.unwatched ?? {},
   sync: { token: "", gistId: "", login: "", lastSync: 0, ...(saved.sync ?? {}), status: saved.sync?.token ? "ok" : "off", error: null },
-  prefs: { tmdbToken: "", omdbKey: "", hideSpoilers: false, ...(saved.prefs ?? {}) },
+  prefs: { tmdbToken: "", omdbKey: "", mdblistKey: "", hideSpoilers: false, ...(saved.prefs ?? {}) },
   pending: {},
   refreshing: false,
   ready: false,
@@ -258,6 +258,7 @@ export function exportBackup(): string {
     watched: Object.entries(state.watched).map(([id, w]) => ({ episodeId: Number(id), showId: w.showId, watchedAt: w.watchedAt })),
     tmdbToken: state.prefs.tmdbToken || null,
     omdbKey: state.prefs.omdbKey || null,
+    mdblistKey: state.prefs.mdblistKey || null,
   };
   return JSON.stringify(b, null, 2);
 }
@@ -287,6 +288,7 @@ export async function importBackup(text: string): Promise<number> {
           ...st.prefs,
           tmdbToken: st.prefs.tmdbToken || b.tmdbToken || "",
           omdbKey: st.prefs.omdbKey || b.omdbKey || "",
+          mdblistKey: st.prefs.mdblistKey || b.mdblistKey || "",
         },
       };
     });
@@ -306,7 +308,7 @@ function toDoc(s: State): SyncDoc {
   for (const [id, w] of Object.entries(s.watched)) d.watched[id] = [w.showId, w.watchedAt];
   for (const [id, at] of Object.entries(s.unwatched)) d.unwatched[id] = at;
   for (const [id, tv] of Object.entries(s.animeLinks)) d.animeLinks[id] = tv;
-  d.keys = { tmdb: s.prefs.tmdbToken || null, omdb: s.prefs.omdbKey || null };
+  d.keys = { tmdb: s.prefs.tmdbToken || null, omdb: s.prefs.omdbKey || null, mdblist: s.prefs.mdblistKey || null };
   return d;
 }
 
@@ -332,7 +334,7 @@ function applyDoc(d: SyncDoc): number[] {
         removed: Object.fromEntries(Object.entries(d.removed).map(([k, v]) => [Number(k), v])),
         unwatched: Object.fromEntries(Object.entries(d.unwatched).map(([k, v]) => [Number(k), v])),
         animeLinks: Object.fromEntries(Object.entries(d.animeLinks).map(([k, v]) => [Number(k), v])),
-        prefs: { ...s.prefs, tmdbToken: s.prefs.tmdbToken || d.keys.tmdb || "", omdbKey: s.prefs.omdbKey || d.keys.omdb || "" },
+        prefs: { ...s.prefs, tmdbToken: s.prefs.tmdbToken || d.keys.tmdb || "", mdblistKey: s.prefs.mdblistKey || d.keys.mdblist || "", omdbKey: s.prefs.omdbKey || d.keys.omdb || "" },
       };
     });
   } finally { applyingRemote = false; }

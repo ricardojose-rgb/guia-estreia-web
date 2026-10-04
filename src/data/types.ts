@@ -35,6 +35,7 @@ export interface WatchedEntry {
 export interface Prefs {
   tmdbToken: string;
   omdbKey: string;
+  mdblistKey: string;
   hideSpoilers: boolean;
 }
 
@@ -121,7 +122,16 @@ export interface Anticipated {
   rank: number;
 }
 
+/** Uma pontuação pronta a mostrar (MDBList). */
+export interface ScoreItem {
+  source: string; // imdb, tomatoes, popcorn, metacritic, tmdb, letterboxd, trakt, myanimelist
+  text: string; // "8,4", "92%", "78"
+  pct: number; // 0–100, para a cor e para fresco/podre
+  votes?: number | null;
+}
+
 export interface Scores {
+  all?: ScoreItem[];
   imdb?: string | null;
   imdbVotes?: string | null;
   imdbId?: string | null;
@@ -137,4 +147,5 @@ export interface Backup {
   watched: { episodeId: number; showId: number; watchedAt: number }[];
   tmdbToken?: string | null;
   omdbKey?: string | null;
+  mdblistKey?: string | null;
 }

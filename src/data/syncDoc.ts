@@ -15,7 +15,7 @@ export interface SyncDoc {
   watched: Record<string, [showId: number, at: number]>;
   unwatched: Record<string, number>;
   animeLinks: Record<string, number>;
-  keys: { tmdb?: string | null; omdb?: string | null };
+  keys: { tmdb?: string | null; omdb?: string | null; mdblist?: string | null };
 }
 
 export const emptyDoc = (): SyncDoc => ({ v: 2, updatedAt: 0, shows: {}, removed: {}, watched: {}, unwatched: {}, animeLinks: {}, keys: {} });
@@ -54,7 +54,7 @@ export function merge(a: SyncDoc, b: SyncDoc): SyncDoc {
     const u = out.unwatched[id];
     if (u != null) { if (u >= out.watched[id][1]) delete out.watched[id]; else delete out.unwatched[id]; }
   }
-  out.keys = { tmdb: a.keys.tmdb || b.keys.tmdb || null, omdb: a.keys.omdb || b.keys.omdb || null };
+  out.keys = { tmdb: a.keys.tmdb || b.keys.tmdb || null, omdb: a.keys.omdb || b.keys.omdb || null, mdblist: a.keys.mdblist || b.keys.mdblist || null };
   out.updatedAt = Math.max(a.updatedAt, b.updatedAt);
   return out;
 }
@@ -64,6 +64,6 @@ export function canonical(d: SyncDoc): string {
   const sort = (o: Record<string, unknown>) => Object.fromEntries(Object.keys(o).sort().map((k) => [k, o[k]]));
   return JSON.stringify({
     v: 2, shows: sort(d.shows), removed: sort(d.removed), watched: sort(d.watched), unwatched: sort(d.unwatched),
-    animeLinks: sort(d.animeLinks), keys: { tmdb: d.keys.tmdb || null, omdb: d.keys.omdb || null },
+    animeLinks: sort(d.animeLinks), keys: { tmdb: d.keys.tmdb || null, omdb: d.keys.omdb || null, mdblist: d.keys.mdblist || null },
   });
 }

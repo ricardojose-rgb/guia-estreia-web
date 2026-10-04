@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { connectSync, disconnectSync, exportBackup, importBackup, setPrefs, syncNow, useStore } from "../data/store";
 import { TOKEN_URL } from "../data/gist";
-import { normalizeOmdbKey, testOmdbKey } from "../data/api";
+import { normalizeMdbKey, normalizeOmdbKey, testMdbKey, testOmdbKey } from "../data/api";
 import { ExternalLink, RefreshCw } from "lucide-react";
 
 function ago(t: number): string {
@@ -73,6 +73,29 @@ function KeyField({ label, value, onSave, placeholder }: { label: string; value:
         value={v} onChange={(e) => { setV(e.target.value); setSaved(false); }} autoComplete="off" />
       <button className="btn filled" onClick={() => { onSave(v.trim()); setSaved(true); }}>{saved ? "Guardado" : "Guardar"}</button>
     </div>
+  );
+}
+
+function MdbField() {
+  const key = useStore((s) => s.prefs.mdblistKey);
+  const [v, setV] = useState(key);
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const save = async (text: string) => {
+    const k = normalizeMdbKey(text);
+    setV(k); setPrefs({ mdblistKey: k }); setBusy(true);
+    setResult(k ? await testMdbKey(k) : null);
+    setBusy(false);
+  };
+  return (
+    <>
+      <div className="line" style={{ flexWrap: "wrap" }}>
+        <input className="field" style={{ flex: "1 1 260px" }} aria-label="Chave do MDBList" placeholder="Chave do MDBList"
+          value={v} onChange={(e) => { setV(e.target.value); setResult(null); }} autoComplete="off" spellCheck={false} />
+        <button className="btn filled" disabled={busy} onClick={() => save(v)}>{busy ? "A testar…" : "Guardar e testar"}</button>
+      </div>
+      {result && <p className="small" style={{ margin: 0, fontWeight: 700, color: result.ok ? "var(--new)" : "var(--film)" }}>{result.message}</p>}
+    </>
   );
 }
 
@@ -160,7 +183,17 @@ export default function Settings() {
       </div>
 
       <div className="card setting">
-        <h3>Pontuações do IMDb e Rotten Tomatoes (OMDb)</h3>
+        <h3>Todas as pontuações (MDBList)</h3>
+        <p className="small muted" style={{ margin: 0 }}>
+          IMDb, Rotten Tomatoes (🍅 críticos e 🍿 público), Metacritic, TMDB, Letterboxd e Trakt, nas séries e nos filmes.
+          Cria conta gratuita em <a className="primary-text" href="https://mdblist.com/preferences/" target="_blank" rel="noopener" style={{ fontWeight: 800 }}>mdblist.com</a>,
+          abre <b>Preferences</b> e copia a <b>API Key</b>. Com esta chave já não precisas da do OMDb.
+        </p>
+        <MdbField />
+      </div>
+
+      <div className="card setting">
+        <h3>Pontuações do IMDb (OMDb) · alternativa</h3>
         <p className="small muted" style={{ margin: 0 }}>Com a chave do OMDb vês a nota do IMDb nas séries e nos filmes, e a do Rotten Tomatoes nos filmes.</p>
         <OmdbField />
       </div>

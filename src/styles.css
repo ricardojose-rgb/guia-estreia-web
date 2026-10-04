@@ -225,3 +225,13 @@ img { display: block; max-width: 100%; }
 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 @media (max-width: 820px) { .hide-sm { display: none; } }
+
+.score.rt.fresh { background: #fa320a; color: #fff; }
+.score.rt.rotten { background: #0f9d58; color: #fff; }
+.score.pop { background: var(--surface-2); color: var(--fg); }
+.score.pop.fresh { background: color-mix(in srgb, #fa320a 16%, var(--surface-2)); }
+.score.mc { color: #fff; }
+.score.mc.good { background: #00ce7a; color: #062b18; }
+.score.mc.mixed { background: #ffbd3f; color: #2b1d00; }
+.score.mc.bad { background: #ff6874; color: #2b0005; }
+a.score:hover { filter: brightness(1.08); }
