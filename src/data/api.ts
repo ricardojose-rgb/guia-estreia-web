@@ -276,24 +276,67 @@ function toScores(r: Omdb, tvmaze?: number | null): Scores {
   };
 }
 
+/** Aceita a chave sozinha ou o link do email do OMDb ("...apikey=abcd1234"). */
+export function normalizeOmdbKey(text: string): string {
+  const t = text.trim();
+  const m = t.match(/apikey=([A-Za-z0-9]+)/i);
+  return (m ? m[1] : t).replace(/[^A-Za-z0-9]/g, "");
+}
+
+async function omdbGet(query: string, key: string): Promise<Omdb & { Error?: string }> {
+  const res = await fetch(`https://www.omdbapi.com/?${query}&apikey=${encodeURIComponent(normalizeOmdbKey(key))}`);
+  // O OMDb responde 401 com uma mensagem quando a chave não é válida ou não foi ativada
+  const body = await res.json().catch(() => null);
+  if (!body) throw new HttpError(res.status);
+  return body;
+}
+
+/** Explica em português o erro do OMDb. */
+export function omdbErrorPt(err?: string): string {
+  const e = (err ?? "").toLowerCase();
+  if (e.includes("invalid api key") || e.includes("no api key")) return "A chave do OMDb não é válida. Confirma que carregaste no link de ativação que veio no email do OMDb.";
+  if (e.includes("limit")) return "Chegaste ao limite diário do OMDb (1000 pedidos). Volta a funcionar amanhã.";
+  return err ? `O OMDb respondeu: ${err}` : "O OMDb não respondeu. Tenta outra vez daqui a pouco.";
+}
+
+/** Testa a chave com uma série conhecida. */
+export async function testOmdbKey(key: string): Promise<{ ok: boolean; message: string }> {
+  try {
+    const r = await omdbGet("i=tt0944947", key);
+    if (r.Response === "True") return { ok: true, message: `Chave válida ✓ (Game of Thrones: IMDb ${r.imdbRating}/10)` };
+    return { ok: false, message: omdbErrorPt(r.Error) };
+  } catch {
+    return { ok: false, message: "Sem ligação ao OMDb. Verifica a internet e tenta outra vez." };
+  }
+}
+
+// Só se guardam em cache as respostas com sucesso; um erro volta a ser tentado na próxima vez.
+async function okOnly(key: string, ttl: number, load: () => Promise<Scores | null>): Promise<Scores | null> {
+  const hit = await idbGet<{ at: number; value: Scores }>(key).catch(() => undefined);
+  if (hit && Date.now() - hit.at < ttl && hit.value.imdb) return hit.value;
+  const value = await load();
+  if (value?.imdb) idbSet(key, { at: Date.now(), value }).catch(() => {});
+  return value;
+}
+
 export async function showScores(key: string, imdbId: string | null | undefined, tvmaze?: number | null): Promise<Scores> {
   if (!key || !imdbId) return { imdbId, tvmaze };
-  return cached(`omdb:${imdbId}`, 7 * 86400_000, async () => {
-    const res = await fetch(`https://www.omdbapi.com/?i=${imdbId}&apikey=${encodeURIComponent(key)}`);
-    if (!res.ok) throw new HttpError(res.status);
-    return toScores(await res.json(), tvmaze);
-  }).catch(() => ({ imdbId, tvmaze }));
+  const s = await okOnly(`omdb2:${imdbId}`, 7 * 86400_000, async () => {
+    const r = await omdbGet(`i=${imdbId}`, key);
+    return r.Response === "True" ? toScores(r, tvmaze) : null;
+  }).catch(() => null);
+  return s ? { ...s, tvmaze } : { imdbId, tvmaze };
 }
 
 export async function movieScores(key: string, m: TmdbMovie): Promise<Scores> {
   if (!key) return {};
-  return cached(`omdb:m${m.id}`, 3 * 86400_000, async () => {
+  const s = await okOnly(`omdb2:m${m.id}`, 3 * 86400_000, async () => {
     const t = encodeURIComponent(m.original_title || m.title);
     const y = m.release_date?.slice(0, 4);
-    const res = await fetch(`https://www.omdbapi.com/?t=${t}&type=movie${y ? `&y=${y}` : ""}&apikey=${encodeURIComponent(key)}`);
-    if (!res.ok) throw new HttpError(res.status);
-    return toScores(await res.json());
-  }).catch(() => ({}));
+    const r = await omdbGet(`t=${t}&type=movie${y ? `&y=${y}` : ""}`, key);
+    return r.Response === "True" ? toScores(r) : null;
+  }).catch(() => null);
+  return s ?? {};
 }
 
 // ---------------- Imagens ----------------

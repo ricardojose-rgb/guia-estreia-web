@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { connectSync, disconnectSync, exportBackup, importBackup, setPrefs, syncNow, useStore } from "../data/store";
 import { TOKEN_URL } from "../data/gist";
+import { normalizeOmdbKey, testOmdbKey } from "../data/api";
 import { ExternalLink, RefreshCw } from "lucide-react";
 
 function ago(t: number): string {
@@ -75,6 +76,30 @@ function KeyField({ label, value, onSave, placeholder }: { label: string; value:
   );
 }
 
+function OmdbField() {
+  const key = useStore((s) => s.prefs.omdbKey);
+  const [v, setV] = useState(key);
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const save = async (text: string) => {
+    const k = normalizeOmdbKey(text);
+    setV(k); setPrefs({ omdbKey: k }); setBusy(true);
+    setResult(k ? await testOmdbKey(k) : null);
+    setBusy(false);
+  };
+  return (
+    <>
+      <p className="small muted" style={{ margin: 0 }}>Podes colar a chave sozinha ou o link completo do email do OMDb. Antes de a usar, carrega no link de ativação desse email.</p>
+      <div className="line" style={{ flexWrap: "wrap" }}>
+        <input className="field" style={{ flex: "1 1 260px" }} aria-label="Chave do OMDb" placeholder="Chave do OMDb (8 letras e números)"
+          value={v} onChange={(e) => { setV(e.target.value); setResult(null); }} autoComplete="off" spellCheck={false} />
+        <button className="btn filled" disabled={busy} onClick={() => save(v)}>{busy ? "A testar…" : "Guardar e testar"}</button>
+      </div>
+      {result && <p className="small" style={{ margin: 0, fontWeight: 700, color: result.ok ? "var(--new)" : "var(--film)" }}>{result.message}</p>}
+    </>
+  );
+}
+
 export default function Settings() {
   const prefs = useStore((s) => s.prefs);
   const busy = useStore((s) => s.refreshing);
@@ -137,7 +162,7 @@ export default function Settings() {
       <div className="card setting">
         <h3>Pontuações do IMDb e Rotten Tomatoes (OMDb)</h3>
         <p className="small muted" style={{ margin: 0 }}>Com a chave do OMDb vês a nota do IMDb nas séries e nos filmes, e a do Rotten Tomatoes nos filmes.</p>
-        <KeyField label="Chave do OMDb" placeholder="Chave do OMDb" value={prefs.omdbKey} onSave={(v) => setPrefs({ omdbKey: v })} />
+        <OmdbField />
       </div>
 
       <div className="card setting">
