@@ -1,8 +1,8 @@
 import { Link, useNavigate } from "react-router-dom";
 import { Fragment, useEffect, useMemo, useState } from "react";
-import type { AniMedia, AnimeEpisode, Premiere, TmdbMovie } from "../data/types";
+import type { AniMedia, AnimeEpisode, HomeMovie, Premiere } from "../data/types";
 import {
-  aniTitle, animeSchedule, animeSeason, animeUpcoming, anticipatedMovies, friendlyError, scoresForMovie, premieres, tmdbPoster, upcomingMovies,
+  aniTitle, animeSchedule, animeSeason, animeUpcoming, anticipatedHome, friendlyError, homeReleases, scoresForMovie, premieres, tmdbPoster,
 } from "../data/api";
 import { followAnime, followById, setWatched, markWatched, useStore } from "../data/store";
 import { agendaEpisodes, type AgendaEpisode } from "../data/selectors";
@@ -231,53 +231,81 @@ export function MoviesList({ withAnticipated = false }: { withAnticipated?: bool
   const omdb = useStore((s) => s.prefs.omdbKey);
   const mdb = useStore((s) => s.prefs.mdblistKey);
   const nav = useNavigate();
-  const movies = useAsync(() => (token ? upcomingMovies(token) : Promise.resolve([] as TmdbMovie[])), [token]);
-  const ant = useAsync(() => (token && withAnticipated ? anticipatedMovies(token) : Promise.resolve([] as TmdbMovie[])), [token, withAnticipated]);
+  const movies = useAsync(() => (token ? homeReleases(token) : Promise.resolve([] as HomeMovie[])), [token]);
+  const ant = useAsync(() => (token && withAnticipated ? anticipatedHome(token) : Promise.resolve([] as HomeMovie[])), [token, withAnticipated]);
   const today = usToday();
   const year = Number(today.slice(0, 4));
 
   if (!token) return (
     <div className="card notice" style={{ marginTop: 18 }}>
       <h3>Liga os filmes ao TMDB</h3>
-      <p className="muted small" style={{ margin: 0 }}>A lista de filmes vem do TMDB, que pede uma chave gratuita. Se já a puseste na app do telemóvel, importa a cópia de segurança nas Definições e fica igual aqui.</p>
+      <p className="muted small" style={{ margin: 0 }}>A lista de filmes vem do TMDB, que pede uma chave gratuita. Se já a puseste na app do telemóvel, a sincronização traz a chave para aqui.</p>
       <button className="btn tonal" onClick={() => nav("/definicoes")}>Abrir Definições</button>
     </div>
   );
 
-  const list = (movies.data ?? []).filter((m) => m.release_date);
-  const groups = groupBy(list, (m) => m.release_date!);
+  const all = movies.data ?? [];
+  const coming = all.filter((m) => m.homeDate >= today);
+  const out = all.filter((m) => m.homeDate < today).reverse();
+  const groups = groupBy(coming, (m) => m.homeDate);
   return (
     <>
-      {withAnticipated && <Carousel title="Mais aguardados" items={(ant.data ?? []).map((m, i) => ({
+      <p className="eyebrow" style={{ marginTop: 14 }}>Quando chegam a casa nos EUA · digital (streaming e aluguer) e Blu-ray</p>
+      {withAnticipated && <Carousel title="Mais aguardados em casa" items={(ant.data ?? []).map((m, i) => ({
         key: `am${m.id}`, title: m.title, image: tmdbPoster(m.poster_path), large: tmdbPoster(m.poster_path, "original"),
-        line1: m.release_date ? shortDate(m.release_date, year) : null, rank: i + 1, href: `https://www.themoviedb.org/movie/${m.id}`,
+        line1: `${m.digitalDate === m.homeDate ? "Digital" : "Blu-ray"} · ${shortDate(m.homeDate, year)}`,
+        line2: m.theatricalDate ? `Cinema: ${shortDate(m.theatricalDate, year)}` : null,
+        rank: i + 1, href: `https://www.themoviedb.org/movie/${m.id}`,
       }))} />}
-      {withAnticipated && <h2 className="h2">Próximas estreias</h2>}
-      {!withAnticipated && <p className="eyebrow" style={{ marginTop: 14 }}>Estreias nos EUA</p>}
-      {movies.loading && <Spinner />}
+      {movies.loading && <div className="small muted" style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 14 }}><span className="spinner" />A procurar as datas de digital e Blu-ray…</div>}
       {movies.error != null && <Empty title="Não foi possível carregar" body={friendlyError(movies.error)} action={<button className="btn tonal" onClick={movies.reload}>Tentar outra vez</button>} />}
+      {coming.length > 0 && <h2 className="h2">Chegam em breve</h2>}
       {groups.map(([date, items]) => (
         <Fragment key={date}>
           <DayHeader date={date} today={today} />
-          <div className="rows two">{items.map((m) => <MovieRow key={m.id} m={m} omdb={omdb} mdb={mdb} />)}</div>
+          <div className="rows two">{items.map((m) => <MovieRow key={m.id} m={m} omdb={omdb} mdb={mdb} year={year} />)}</div>
         </Fragment>
       ))}
-      {movies.data && <p className="small muted" style={{ marginTop: 28 }}>Dados de filmes: TMDB. Este produto usa a API do TMDB mas não é endossado nem certificado pelo TMDB.</p>}
+      {out.length > 0 && (
+        <>
+          <h2 className="h2">Já disponíveis · últimos 30 dias</h2>
+          <div className="rows two">{out.map((m) => <MovieRow key={m.id} m={m} omdb={omdb} mdb={mdb} year={year} showDate />)}</div>
+        </>
+      )}
+      {movies.data && !all.length && <Empty title="Sem filmes" body="Não encontrei filmes a sair em digital ou Blu-ray nas próximas semanas." />}
+      {movies.data && <p className="small muted" style={{ marginTop: 28 }}>Datas dos EUA; em Portugal o digital costuma chegar na mesma altura ou pouco depois. Dados de filmes: TMDB. Este produto usa a API do TMDB mas não é endossado nem certificado pelo TMDB.</p>}
     </>
   );
 }
 
-function MovieRow({ m, omdb, mdb }: { m: TmdbMovie; omdb: string; mdb: string }) {
+function MovieRow({ m, omdb, mdb, year, showDate }: { m: HomeMovie; omdb: string; mdb: string; year: number; showDate?: boolean }) {
   const [scores, setScores] = useState<Awaited<ReturnType<typeof scoresForMovie>> | null>(null);
   useEffect(() => { let alive = true; scoresForMovie({ omdbKey: omdb, mdblistKey: mdb }, m).then((s) => alive && setScores(s)); return () => { alive = false; }; }, [m.id, omdb, mdb]);
+  const parts = [
+    m.digitalDate ? `Digital ${shortDate(m.digitalDate, year)}` : null,
+    m.physicalDate ? `Blu-ray ${shortDate(m.physicalDate, year)}` : null,
+    m.theatricalDate ? `Cinema ${shortDate(m.theatricalDate, year)}` : null,
+  ].filter(Boolean).join(" · ");
   return (
     <div className="row">
       <Poster src={tmdbPoster(m.poster_path, "w185")} large={tmdbPoster(m.poster_path, "original")} title={m.title} width={52} />
       <a className="body" href={`https://www.themoviedb.org/movie/${m.id}`} target="_blank" rel="noopener">
-        <span><Tag kind="film">Filme</Tag></span>
+        <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {m.digitalDate === m.homeDate && <Tag kind="film">Digital</Tag>}
+          {m.physicalDate && <Tag kind="ret">Blu-ray</Tag>}
+          {showDate && <span className="small muted">{shortDate(m.homeDate, year)}</span>}
+        </span>
         <span className="title clamp2">{m.title}</span>
+        <span className="small muted clamp1">{parts}</span>
         <ScoreChips scores={scores} title={m.title} />
-        {m.overview && <span className="small muted clamp2">{m.overview}</span>}
+        {m.providersPT.length > 0 && (
+          <span className="small" style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+            <span className="muted">Em Portugal:</span>
+            {m.providersPT.slice(0, 4).map((p) => p.logo
+              ? <img key={p.name} src={p.logo} alt={p.name} title={p.name} style={{ width: 22, height: 22, borderRadius: 6 }} />
+              : <span key={p.name}>{p.name}</span>)}
+          </span>
+        )}
       </a>
     </div>
   );

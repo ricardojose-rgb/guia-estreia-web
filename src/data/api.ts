@@ -1,5 +1,5 @@
 import { get as idbGet, set as idbSet } from "idb-keyval";
-import type { AniMedia, AnimeEpisode, Anticipated, Premiere, ScoreItem, Scores, TmdbMovie, TmEpisode, TmShow } from "./types";
+import type { AniMedia, AnimeEpisode, Anticipated, HomeMovie, Premiere, ScoreItem, Scores, TmdbMovie, TmEpisode, TmShow } from "./types";
 import { addDays, seasonOf, usToday } from "./dates";
 
 export class HttpError extends Error {
@@ -434,4 +434,59 @@ export async function scoresForMovie(prefs: { mdblistKey: string; omdbKey: strin
     if (all?.length) return { all };
   }
   return movieScores(prefs.omdbKey, m);
+}
+
+// ---------------- Filmes em casa (digital e Blu-ray) ----------------
+// O TMDB guarda as datas de lançamento por país e por tipo: 1 antestreia, 2 e 3 cinema, 4 digital, 5 físico (Blu-ray/DVD).
+
+type ReleaseDates = { results?: { iso_3166_1: string; release_dates: { type: number; release_date: string }[] }[] };
+type Providers = { results?: Record<string, { flatrate?: { provider_name: string; logo_path?: string | null }[] }> };
+
+async function homeDetails(token: string, m: TmdbMovie): Promise<HomeMovie | null> {
+  return cached(`home:${m.id}`, 24 * 3600_000, async () => {
+    const d = await tmdb<TmdbMovie & { release_dates?: ReleaseDates; "watch/providers"?: Providers }>(token,
+      `movie/${m.id}?language=pt-PT&append_to_response=release_dates,watch/providers`);
+    const us = d.release_dates?.results?.find((r) => r.iso_3166_1 === "US")?.release_dates ?? [];
+    const first = (types: number[]) => us.filter((x) => types.includes(x.type)).map((x) => x.release_date.slice(0, 10)).sort()[0] ?? null;
+    const digitalDate = first([4]), physicalDate = first([5]), theatricalDate = first([2, 3]);
+    const homeDate = [digitalDate, physicalDate].filter(Boolean).sort()[0] as string | undefined;
+    if (!homeDate) return null;
+    const pt = d["watch/providers"]?.results?.PT?.flatrate ?? [];
+    return {
+      ...m, title: d.title || m.title, overview: d.overview || m.overview,
+      homeDate, digitalDate, physicalDate, theatricalDate,
+      providersPT: pt.map((p) => ({ name: p.provider_name, logo: p.logo_path ? `https://image.tmdb.org/t/p/w92${p.logo_path}` : null })),
+    };
+  }).catch(() => null);
+}
+
+/** Filmes que chegam (ou chegaram há pouco) a casa nos EUA: digital/streaming ou Blu-ray. */
+export function homeReleases(token: string): Promise<HomeMovie[]> {
+  const today = usToday();
+  return cached(`home:list:${today}`, 6 * 3600_000, async () => {
+    const from = addDays(today, -30), to = addDays(today, 90);
+    const pages = await Promise.all([1, 2, 3].map((p) =>
+      tmdb<{ results: TmdbMovie[] }>(token,
+        `discover/movie?language=pt-PT&region=US&with_release_type=4|5&release_date.gte=${from}&release_date.lte=${to}&sort_by=popularity.desc&include_adult=false&page=${p}`)
+        .catch((e) => { if (p === 1) throw e; return { results: [] }; })));
+    const seen = new Set<number>();
+    const base = pages.flatMap((p) => p.results).filter((m) => !seen.has(m.id) && seen.add(m.id)).slice(0, 50);
+    const out: HomeMovie[] = [];
+    for (let i = 0; i < base.length; i += 10) {
+      const batch = await Promise.all(base.slice(i, i + 10).map((m) => homeDetails(token, m)));
+      for (const h of batch) if (h && h.homeDate >= from && h.homeDate <= to) out.push(h);
+    }
+    return out.sort((a, b) => a.homeDate.localeCompare(b.homeDate) || (b.popularity ?? 0) - (a.popularity ?? 0));
+  });
+}
+
+/** Filmes mais aguardados em casa nos próximos 6 meses. */
+export function anticipatedHome(token: string): Promise<HomeMovie[]> {
+  const today = usToday();
+  return cached(`home:anticipated:${today}`, 12 * 3600_000, async () => {
+    const r = await tmdb<{ results: TmdbMovie[] }>(token,
+      `discover/movie?language=pt-PT&region=US&with_release_type=4|5&release_date.gte=${addDays(today, 1)}&release_date.lte=${addDays(today, 180)}&sort_by=popularity.desc&include_adult=false`);
+    const list = await Promise.all(r.results.slice(0, 20).map((m) => homeDetails(token, m)));
+    return list.filter((h): h is HomeMovie => !!h && h.homeDate > today);
+  });
 }

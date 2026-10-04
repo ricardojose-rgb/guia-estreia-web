@@ -101,6 +101,15 @@ export interface AniMedia {
 export interface AnimeEpisode { episode: number; airingAt: number; media: AniMedia }
 
 // ---- TMDB ----
+/** Filme com a data em que chega a casa (digital ou Blu-ray) nos EUA. */
+export interface HomeMovie extends TmdbMovie {
+  homeDate: string; // primeira data digital ou física
+  digitalDate: string | null;
+  physicalDate: string | null;
+  theatricalDate: string | null;
+  providersPT: { name: string; logo: string | null }[]; // onde ver em Portugal (subscrição)
+}
+
 export interface TmdbMovie {
   id: number;
   title: string;
