@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { HashRouter, NavLink, Route, Routes, useLocation } from "react-router-dom";
-import { CalendarDays, CirclePlay, Clapperboard, Compass, Library, RefreshCw, Settings as Cog } from "lucide-react";
+import { CalendarDays, CirclePlay, Clapperboard, Compass, Library, RefreshCw, Settings as Cog, Sparkles } from "lucide-react";
 import { MoviePage, MyMovies } from "./screens/Movies";
 import { AnimePage } from "./screens/Anime";
 import { refreshAll, useStore } from "./data/store";
@@ -17,6 +17,7 @@ const NAV = [
   { to: "/", label: "Para ver", icon: CirclePlay, end: true },
   { to: "/agenda", label: "Agenda", icon: CalendarDays },
   { to: "/series", label: "Séries", icon: Library },
+  { to: "/anime", label: "Anime", icon: Sparkles },
   { to: "/filmes", label: "Filmes", icon: Clapperboard },
   { to: "/descobrir", label: "Descobrir", icon: Compass },
 ];
@@ -103,7 +104,8 @@ function Shell() {
         <Routes>
           <Route path="/" element={<Page title="Para ver"><UpNextScreen /></Page>} />
           <Route path="/agenda" element={<Page title="Agenda"><Agenda /></Page>} />
-          <Route path="/series" element={<Page title="As minhas séries"><MyShows /></Page>} />
+          <Route path="/series" element={<Page title="As minhas séries"><MyShows key="series" /></Page>} />
+          <Route path="/anime" element={<Page title="Os meus animes"><MyShows key="anime" kind="anime" /></Page>} />
           <Route path="/descobrir" element={<Page title="Descobrir"><Discover /></Page>} />
           <Route path="/definicoes" element={<Page title="Definições"><Settings /></Page>} />
           <Route path="/serie/:id" element={<div className="page"><ShowPage /></div>} />
