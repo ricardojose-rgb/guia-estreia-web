@@ -15,10 +15,15 @@ export interface SyncDoc {
   watched: Record<string, [showId: number, at: number]>;
   unwatched: Record<string, number>;
   animeLinks: Record<string, number>;
+  movies?: Record<string, { title: string; poster: string | null; year: string | null; addedAt: number }>;
+  moviesRemoved?: Record<string, number>;
+  moviesWatched?: Record<string, number>;
+  moviesUnwatched?: Record<string, number>;
   keys: { tmdb?: string | null; omdb?: string | null; mdblist?: string | null };
 }
 
-export const emptyDoc = (): SyncDoc => ({ v: 2, updatedAt: 0, shows: {}, removed: {}, watched: {}, unwatched: {}, animeLinks: {}, keys: {} });
+export const emptyDoc = (): SyncDoc => ({ v: 2, updatedAt: 0, shows: {}, removed: {}, watched: {}, unwatched: {}, animeLinks: {},
+  movies: {}, moviesRemoved: {}, moviesWatched: {}, moviesUnwatched: {}, keys: {} });
 
 /** Lê um documento remoto, tolerando campos em falta. */
 export function parseDoc(text: string | null | undefined): SyncDoc {
@@ -44,6 +49,21 @@ export function merge(a: SyncDoc, b: SyncDoc): SyncDoc {
     }
     for (const [id, at] of Object.entries(src.unwatched)) out.unwatched[id] = Math.max(out.unwatched[id] ?? 0, at);
     for (const [id, tv] of Object.entries(src.animeLinks)) out.animeLinks[id] = tv;
+    for (const [id, m] of Object.entries(src.movies ?? {})) {
+      const cur = out.movies![id];
+      if (!cur || m.addedAt > cur.addedAt || (m.addedAt === cur.addedAt && m.title > cur.title)) out.movies![id] = { title: m.title, poster: m.poster ?? null, year: m.year ?? null, addedAt: m.addedAt };
+    }
+    for (const [id, at] of Object.entries(src.moviesRemoved ?? {})) out.moviesRemoved![id] = Math.max(out.moviesRemoved![id] ?? 0, at);
+    for (const [id, at] of Object.entries(src.moviesWatched ?? {})) out.moviesWatched![id] = Math.max(out.moviesWatched![id] ?? 0, at);
+    for (const [id, at] of Object.entries(src.moviesUnwatched ?? {})) out.moviesUnwatched![id] = Math.max(out.moviesUnwatched![id] ?? 0, at);
+  }
+  for (const id of Object.keys(out.movies!)) {
+    const r = out.moviesRemoved![id];
+    if (r != null) { if (r >= out.movies![id].addedAt) delete out.movies![id]; else delete out.moviesRemoved![id]; }
+  }
+  for (const id of Object.keys(out.moviesWatched!)) {
+    const u = out.moviesUnwatched![id];
+    if (u != null) { if (u >= out.moviesWatched![id]) delete out.moviesWatched![id]; else delete out.moviesUnwatched![id]; }
   }
   // Fica só o acontecimento mais recente de cada item
   for (const id of Object.keys(out.shows)) {
@@ -64,6 +84,8 @@ export function canonical(d: SyncDoc): string {
   const sort = (o: Record<string, unknown>) => Object.fromEntries(Object.keys(o).sort().map((k) => [k, o[k]]));
   return JSON.stringify({
     v: 2, shows: sort(d.shows), removed: sort(d.removed), watched: sort(d.watched), unwatched: sort(d.unwatched),
-    animeLinks: sort(d.animeLinks), keys: { tmdb: d.keys.tmdb || null, omdb: d.keys.omdb || null, mdblist: d.keys.mdblist || null },
+    animeLinks: sort(d.animeLinks),
+    movies: sort(d.movies ?? {}), moviesRemoved: sort(d.moviesRemoved ?? {}), moviesWatched: sort(d.moviesWatched ?? {}), moviesUnwatched: sort(d.moviesUnwatched ?? {}),
+    keys: { tmdb: d.keys.tmdb || null, omdb: d.keys.omdb || null, mdblist: d.keys.mdblist || null },
   });
 }

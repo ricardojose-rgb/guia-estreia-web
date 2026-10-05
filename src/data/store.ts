@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { del as idbDel, get as idbGet, set as idbSet } from "idb-keyval";
-import type { AniMedia, Backup, Episode, Prefs, Show, TmEpisode, TmShow, WatchedEntry } from "./types";
+import type { AniMedia, Backup, Episode, MovieEntry, Prefs, Show, TmEpisode, TmShow, WatchedEntry } from "./types";
 import { channelOf, findAnimeShow, friendlyError, TvMaze } from "./api";
 import { usToday } from "./dates";
 import { canonical, emptyDoc, merge, parseDoc, type SyncDoc } from "./syncDoc";
@@ -24,6 +24,10 @@ interface State {
   animeLinks: Record<number, number>; // id AniList -> id TVmaze
   removed: Record<number, number>; // série -> quando deixou de ser seguida
   unwatched: Record<number, number>; // episódio -> quando foi desmarcado
+  movies: Record<number, MovieEntry>; // filmes na lista (por ver e vistos)
+  moviesRemoved: Record<number, number>;
+  moviesWatched: Record<number, number>; // filme -> quando foi visto
+  moviesUnwatched: Record<number, number>;
   sync: SyncState;
   prefs: Prefs;
   pending: Record<string, true>;
@@ -49,6 +53,10 @@ let state: State = {
   animeLinks: saved.animeLinks ?? {},
   removed: saved.removed ?? {},
   unwatched: saved.unwatched ?? {},
+  movies: saved.movies ?? {},
+  moviesRemoved: saved.moviesRemoved ?? {},
+  moviesWatched: saved.moviesWatched ?? {},
+  moviesUnwatched: saved.moviesUnwatched ?? {},
   sync: { token: "", gistId: "", login: "", lastSync: 0, ...(saved.sync ?? {}), status: saved.sync?.token ? "ok" : "off", error: null },
   prefs: { tmdbToken: "", omdbKey: "", mdblistKey: "", hideSpoilers: false, ...(saved.prefs ?? {}) },
   pending: {},
@@ -61,9 +69,10 @@ const listeners = new Set<() => void>();
 
 function persist() {
   try {
-    const { shows, watched, animeLinks, prefs, removed, unwatched } = state;
+    const { shows, watched, animeLinks, prefs, removed, unwatched, movies, moviesRemoved, moviesWatched, moviesUnwatched } = state;
     const { token, gistId, login, lastSync } = state.sync;
-    localStorage.setItem(LS, JSON.stringify({ shows, watched, animeLinks, prefs, removed, unwatched, sync: { token, gistId, login, lastSync } }));
+    localStorage.setItem(LS, JSON.stringify({ shows, watched, animeLinks, prefs, removed, unwatched, movies, moviesRemoved, moviesWatched, moviesUnwatched,
+      sync: { token, gistId, login, lastSync } }));
   } catch { /* armazenamento cheio ou bloqueado: continua em memória */ }
 }
 
@@ -75,7 +84,8 @@ function setState(patch: Partial<State> | ((s: State) => Partial<State>), save =
   if (save) persist();
   listeners.forEach((l) => l());
   // Qualquer mudança aos dados sincronizados agenda uma sincronização
-  if (save && !applyingRemote && ("shows" in p || "watched" in p || "removed" in p || "unwatched" in p || "animeLinks" in p)) scheduleSync();
+  if (save && !applyingRemote && ("shows" in p || "watched" in p || "removed" in p || "unwatched" in p || "animeLinks" in p ||
+    "movies" in p || "moviesRemoved" in p || "moviesWatched" in p || "moviesUnwatched" in p)) scheduleSync();
 }
 
 export function useStore<T>(sel: (s: State) => T): T {
@@ -308,6 +318,10 @@ function toDoc(s: State): SyncDoc {
   for (const [id, w] of Object.entries(s.watched)) d.watched[id] = [w.showId, w.watchedAt];
   for (const [id, at] of Object.entries(s.unwatched)) d.unwatched[id] = at;
   for (const [id, tv] of Object.entries(s.animeLinks)) d.animeLinks[id] = tv;
+  for (const m of Object.values(s.movies)) d.movies![m.id] = { title: m.title, poster: m.poster, year: m.year, addedAt: m.addedAt };
+  for (const [id, at] of Object.entries(s.moviesRemoved)) d.moviesRemoved![id] = at;
+  for (const [id, at] of Object.entries(s.moviesWatched)) d.moviesWatched![id] = at;
+  for (const [id, at] of Object.entries(s.moviesUnwatched)) d.moviesUnwatched![id] = at;
   d.keys = { tmdb: s.prefs.tmdbToken || null, omdb: s.prefs.omdbKey || null, mdblist: s.prefs.mdblistKey || null };
   return d;
 }
@@ -334,6 +348,8 @@ function applyDoc(d: SyncDoc): number[] {
         removed: Object.fromEntries(Object.entries(d.removed).map(([k, v]) => [Number(k), v])),
         unwatched: Object.fromEntries(Object.entries(d.unwatched).map(([k, v]) => [Number(k), v])),
         animeLinks: Object.fromEntries(Object.entries(d.animeLinks).map(([k, v]) => [Number(k), v])),
+        movies: Object.fromEntries(Object.entries(d.movies ?? {}).map(([k, v]) => [Number(k), { id: Number(k), ...v }])),
+        moviesRemoved: numKeys(d.moviesRemoved), moviesWatched: numKeys(d.moviesWatched), moviesUnwatched: numKeys(d.moviesUnwatched),
         prefs: { ...s.prefs, tmdbToken: s.prefs.tmdbToken || d.keys.tmdb || "", mdblistKey: s.prefs.mdblistKey || d.keys.mdblist || "", omdbKey: s.prefs.omdbKey || d.keys.omdb || "" },
       };
     });
@@ -405,4 +421,39 @@ export async function connectSync(token: string): Promise<string> {
 
 export function disconnectSync() {
   setSync({ token: "", gistId: "", login: "", lastSync: 0, status: "off", error: null });
+}
+
+const numKeys = (o?: Record<string, number>) => Object.fromEntries(Object.entries(o ?? {}).map(([k, v]) => [Number(k), v]));
+
+// ---------- filmes ----------
+
+export function toMovieEntry(m: { id: number; title: string; poster_path?: string | null; poster?: string | null; release_date?: string | null; year?: string | null }): MovieEntry {
+  return { id: m.id, title: m.title, poster: m.poster ?? m.poster_path ?? null, year: m.year ?? m.release_date?.slice(0, 4) ?? null, addedAt: Date.now() };
+}
+
+/** Junta à lista "Por ver". */
+export function addMovie(m: MovieEntry) {
+  setState((s) => ({ movies: { ...s.movies, [m.id]: { ...m, addedAt: Date.now() } }, moviesRemoved: without(s.moviesRemoved, m.id) }));
+  say(`✓ ${m.title} adicionado aos teus filmes`);
+}
+
+/** Tira o filme da lista (por ver e vistos). */
+export function removeMovie(id: number) {
+  const name = state.movies[id]?.title ?? "O filme";
+  setState((s) => {
+    const movies = { ...s.movies }; delete movies[id];
+    return { movies, moviesRemoved: { ...s.moviesRemoved, [id]: Date.now() } };
+  });
+  say(`${name} saiu dos teus filmes`);
+}
+
+/** Marca como visto (e junta à lista se ainda não estiver) ou desmarca. */
+export function setMovieWatched(m: MovieEntry, on: boolean) {
+  const now = Date.now();
+  setState((s) => {
+    const movies = s.movies[m.id] ? s.movies : { ...s.movies, [m.id]: { ...m, addedAt: now } };
+    if (on) return { movies, moviesRemoved: without(s.moviesRemoved, m.id), moviesWatched: { ...s.moviesWatched, [m.id]: now }, moviesUnwatched: without(s.moviesUnwatched, m.id) };
+    return { moviesWatched: without(s.moviesWatched, m.id), moviesUnwatched: { ...s.moviesUnwatched, [m.id]: now } };
+  });
+  if (on) say(`✓ ${m.title} marcado como visto`);
 }

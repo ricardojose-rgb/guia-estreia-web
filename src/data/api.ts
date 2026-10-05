@@ -1,5 +1,5 @@
 import { get as idbGet, set as idbSet } from "idb-keyval";
-import type { AniMedia, AnimeEpisode, Anticipated, HomeMovie, Premiere, ScoreItem, Scores, TmdbMovie, TmEpisode, TmShow } from "./types";
+import type { AniMedia, AnimeEpisode, Anticipated, HomeMovie, MovieDetails, Premiere, ScoreItem, Scores, TmdbMovie, TmEpisode, TmShow } from "./types";
 import { addDays, seasonOf, usToday } from "./dates";
 
 export class HttpError extends Error {
@@ -488,5 +488,42 @@ export function anticipatedHome(token: string): Promise<HomeMovie[]> {
       `discover/movie?language=pt-PT&region=US&with_release_type=4|5&release_date.gte=${addDays(today, 1)}&release_date.lte=${addDays(today, 180)}&sort_by=popularity.desc&include_adult=false`);
     const list = await Promise.all(r.results.slice(0, 20).map((m) => homeDetails(token, m)));
     return list.filter((h): h is HomeMovie => !!h && h.homeDate > today);
+  });
+}
+
+// ---------------- Filmes: pesquisa e detalhes ----------------
+
+export async function searchMovies(token: string, q: string): Promise<TmdbMovie[]> {
+  const r = await tmdb<{ results: TmdbMovie[] }>(token, `search/movie?language=pt-PT&include_adult=false&query=${encodeURIComponent(q)}`);
+  return r.results;
+}
+
+type Prov = { provider_name: string; logo_path?: string | null };
+const provList = (l?: Prov[]) => (l ?? []).map((p) => ({ name: p.provider_name, logo: p.logo_path ? `https://image.tmdb.org/t/p/w92${p.logo_path}` : null }));
+
+/** Tudo o que a página do filme mostra; cache de 24 horas. */
+export function movieDetails(token: string, id: number): Promise<MovieDetails> {
+  return cached(`movie:${id}`, 24 * 3600_000, async () => {
+    type D = {
+      id: number; title: string; original_title?: string; overview?: string; poster_path?: string | null; backdrop_path?: string | null;
+      release_date?: string; runtime?: number | null; genres?: { name: string }[]; imdb_id?: string | null;
+      release_dates?: ReleaseDates;
+      "watch/providers"?: { results?: Record<string, { flatrate?: Prov[]; rent?: Prov[]; buy?: Prov[] }> };
+    };
+    const d = await tmdb<D>(token, `movie/${id}?language=pt-PT&append_to_response=release_dates,watch/providers`);
+    const us = d.release_dates?.results?.find((r) => r.iso_3166_1 === "US")?.release_dates ?? [];
+    const first = (types: number[]) => us.filter((x) => types.includes(x.type)).map((x) => x.release_date.slice(0, 10)).sort()[0] ?? null;
+    const digitalDate = first([4]), physicalDate = first([5]);
+    const theatricalDate = first([2, 3]) ?? d.release_date ?? null;
+    const pt = d["watch/providers"]?.results?.PT;
+    const rent = [...(pt?.rent ?? []), ...(pt?.buy ?? [])].filter((p, i, a) => a.findIndex((x) => x.provider_name === p.provider_name) === i);
+    return {
+      id: d.id, title: d.title, originalTitle: d.original_title ?? d.title, overview: d.overview ?? "",
+      poster: d.poster_path ?? null, backdrop: d.backdrop_path ?? null, year: d.release_date?.slice(0, 4) ?? null,
+      runtime: d.runtime ?? null, genres: (d.genres ?? []).map((g) => g.name), imdbId: d.imdb_id ?? null,
+      theatricalDate, digitalDate, physicalDate,
+      homeDate: [digitalDate, physicalDate].filter(Boolean).sort()[0] ?? null,
+      providersPT: provList(pt?.flatrate), rentPT: provList(rent),
+    };
   });
 }

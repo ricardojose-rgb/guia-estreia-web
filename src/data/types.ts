@@ -27,6 +27,35 @@ export interface Episode {
   runtime: number | null;
 }
 
+/** Um filme na lista do utilizador (id do TMDB). */
+export interface MovieEntry {
+  id: number;
+  title: string;
+  poster: string | null; // poster_path do TMDB
+  year: string | null;
+  addedAt: number;
+}
+
+/** Detalhes de um filme para a página do filme. */
+export interface MovieDetails {
+  id: number;
+  title: string;
+  originalTitle: string;
+  overview: string;
+  poster: string | null;
+  backdrop: string | null;
+  year: string | null;
+  runtime: number | null;
+  genres: string[];
+  imdbId: string | null;
+  theatricalDate: string | null;
+  digitalDate: string | null;
+  physicalDate: string | null;
+  homeDate: string | null;
+  providersPT: { name: string; logo: string | null }[];
+  rentPT: { name: string; logo: string | null }[];
+}
+
 export interface WatchedEntry {
   showId: number;
   watchedAt: number;

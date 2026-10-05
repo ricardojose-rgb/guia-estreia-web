@@ -1,10 +1,12 @@
 import { Link, useNavigate } from "react-router-dom";
+import { Search, X } from "lucide-react";
+import { MovieButtons } from "./Movies";
 import { Fragment, useEffect, useMemo, useState } from "react";
-import type { AniMedia, AnimeEpisode, HomeMovie, Premiere } from "../data/types";
+import type { AniMedia, AnimeEpisode, HomeMovie, Premiere, TmdbMovie } from "../data/types";
 import {
-  aniTitle, animeSchedule, animeSeason, animeUpcoming, anticipatedHome, friendlyError, homeReleases, scoresForMovie, premieres, tmdbPoster,
+  aniTitle, animeSchedule, animeSeason, animeUpcoming, anticipatedHome, friendlyError, homeReleases, scoresForMovie, premieres, searchMovies, tmdbPoster,
 } from "../data/api";
-import { followAnime, followById, setWatched, markWatched, useStore } from "../data/store";
+import { followAnime, followById, setWatched, markWatched, toMovieEntry, useStore } from "../data/store";
 import { agendaEpisodes, type AgendaEpisode } from "../data/selectors";
 import { addDays, episodeCode, episodeTitle, MONTHS_SHORT, ptAirTime, ptDayTime, ptToday, SEASON_PT, seasonOf, shortDate, usToday } from "../data/dates";
 import { AniScore, Carousel, Chips, DayHeader, Empty, FollowButton, Poster, ScoreChips, Spinner, Tag, useAsync } from "../ui/components";
@@ -233,6 +235,8 @@ export function MoviesList({ withAnticipated = false }: { withAnticipated?: bool
   const nav = useNavigate();
   const movies = useAsync(() => (token ? homeReleases(token) : Promise.resolve([] as HomeMovie[])), [token]);
   const ant = useAsync(() => (token && withAnticipated ? anticipatedHome(token) : Promise.resolve([] as HomeMovie[])), [token, withAnticipated]);
+  const [q, setQ] = useState("");
+  const results = useAsync(() => (q.trim().length >= 2 ? new Promise<TmdbMovie[]>((res, rej) => setTimeout(() => searchMovies(token, q.trim()).then(res, rej), 350)) : Promise.resolve(null)), [q]);
   const today = usToday();
   const year = Number(today.slice(0, 4));
 
@@ -250,12 +254,38 @@ export function MoviesList({ withAnticipated = false }: { withAnticipated?: bool
   const groups = groupBy(coming, (m) => m.homeDate);
   return (
     <>
+      {withAnticipated && (
+        <div className="search" style={{ marginTop: 14 }}>
+          <Search size={19} className="muted" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Procurar um filme" aria-label="Procurar um filme" />
+          {q && <button aria-label="Limpar pesquisa" onClick={() => setQ("")}><X size={18} /></button>}
+        </div>
+      )}
+      {withAnticipated && q.trim().length >= 2 && (
+        <>
+          {results.loading && <Spinner />}
+          {results.data && !results.data.length && <Empty title="Sem resultados" body="Não encontrei nenhum filme com esse nome." />}
+          <div className="rows two" style={{ marginTop: 14 }}>
+            {(results.data ?? []).map((m) => (
+              <div className="row" key={m.id}>
+                <Poster src={tmdbPoster(m.poster_path, "w185")} large={tmdbPoster(m.poster_path, "original")} title={m.title} width={52} />
+                <Link className="body" to={`/filme/${m.id}`}>
+                  <span className="title clamp2">{m.title}</span>
+                  <span className="small muted">{m.release_date?.slice(0, 4) ?? "Sem data"}</span>
+                </Link>
+                <MovieButtons entry={toMovieEntry(m)} compact />
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+      {!(withAnticipated && q.trim().length >= 2) && <>
       <p className="eyebrow" style={{ marginTop: 14 }}>Quando chegam a casa nos EUA · digital (streaming e aluguer) e Blu-ray</p>
       {withAnticipated && <Carousel title="Mais aguardados em casa" items={(ant.data ?? []).map((m, i) => ({
         key: `am${m.id}`, title: m.title, image: tmdbPoster(m.poster_path), large: tmdbPoster(m.poster_path, "original"),
         line1: `${m.digitalDate === m.homeDate ? "Digital" : "Blu-ray"} · ${shortDate(m.homeDate, year)}`,
         line2: m.theatricalDate ? `Cinema: ${shortDate(m.theatricalDate, year)}` : null,
-        rank: i + 1, href: `https://www.themoviedb.org/movie/${m.id}`,
+        rank: i + 1, onClick: () => nav(`/filme/${m.id}`),
       }))} />}
       {movies.loading && <div className="small muted" style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 14 }}><span className="spinner" />A procurar as datas de digital e Blu-ray…</div>}
       {movies.error != null && <Empty title="Não foi possível carregar" body={friendlyError(movies.error)} action={<button className="btn tonal" onClick={movies.reload}>Tentar outra vez</button>} />}
@@ -273,6 +303,7 @@ export function MoviesList({ withAnticipated = false }: { withAnticipated?: bool
         </>
       )}
       {movies.data && !all.length && <Empty title="Sem filmes" body="Não encontrei filmes a sair em digital ou Blu-ray nas próximas semanas." />}
+      </>}
       {movies.data && <p className="small muted" style={{ marginTop: 28 }}>Datas dos EUA; em Portugal o digital costuma chegar na mesma altura ou pouco depois. Dados de filmes: TMDB. Este produto usa a API do TMDB mas não é endossado nem certificado pelo TMDB.</p>}
     </>
   );
@@ -289,7 +320,7 @@ function MovieRow({ m, omdb, mdb, year, showDate }: { m: HomeMovie; omdb: string
   return (
     <div className="row">
       <Poster src={tmdbPoster(m.poster_path, "w185")} large={tmdbPoster(m.poster_path, "original")} title={m.title} width={52} />
-      <a className="body" href={`https://www.themoviedb.org/movie/${m.id}`} target="_blank" rel="noopener">
+      <Link className="body" to={`/filme/${m.id}`}>
         <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {m.digitalDate === m.homeDate && <Tag kind="film">Digital</Tag>}
           {m.physicalDate && <Tag kind="ret">Blu-ray</Tag>}
@@ -306,7 +337,8 @@ function MovieRow({ m, omdb, mdb, year, showDate }: { m: HomeMovie; omdb: string
               : <span key={p.name}>{p.name}</span>)}
           </span>
         )}
-      </a>
+      </Link>
+      <MovieButtons entry={toMovieEntry(m)} compact />
     </div>
   );
 }

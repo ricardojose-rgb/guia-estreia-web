@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { HashRouter, NavLink, Route, Routes, useLocation } from "react-router-dom";
-import { CalendarDays, CirclePlay, Compass, Library, RefreshCw, Settings as Cog } from "lucide-react";
+import { CalendarDays, CirclePlay, Clapperboard, Compass, Library, RefreshCw, Settings as Cog } from "lucide-react";
+import { MoviePage, MyMovies } from "./screens/Movies";
 import { refreshAll, useStore } from "./data/store";
 import { Segmented, Toasts } from "./ui/components";
 import UpNextScreen from "./screens/UpNext";
@@ -14,6 +15,7 @@ const NAV = [
   { to: "/", label: "Para ver", icon: CirclePlay, end: true },
   { to: "/agenda", label: "Agenda", icon: CalendarDays },
   { to: "/series", label: "Séries", icon: Library },
+  { to: "/filmes", label: "Filmes", icon: Clapperboard },
   { to: "/descobrir", label: "Descobrir", icon: Compass },
 ];
 
@@ -80,7 +82,7 @@ function SyncBadge() {
 
 function Shell() {
   const loc = useLocation();
-  const isShow = loc.pathname.startsWith("/serie/");
+  const isShow = loc.pathname.startsWith("/serie/") || loc.pathname.startsWith("/filme/");
   return (
     <div className="app">
       <aside className="sidebar">
@@ -102,6 +104,8 @@ function Shell() {
           <Route path="/descobrir" element={<Page title="Descobrir"><Discover /></Page>} />
           <Route path="/definicoes" element={<Page title="Definições"><Settings /></Page>} />
           <Route path="/serie/:id" element={<div className="page"><ShowPage /></div>} />
+          <Route path="/filmes" element={<Page title="Os meus filmes"><MyMovies /></Page>} />
+          <Route path="/filme/:id" element={<div className="page"><MoviePage /></div>} />
         </Routes>
       </main>
       {!isShow && (
