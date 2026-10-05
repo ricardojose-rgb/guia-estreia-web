@@ -1,5 +1,5 @@
 import { get as idbGet, set as idbSet } from "idb-keyval";
-import type { AniMedia, AnimeEpisode, Anticipated, HomeMovie, MovieDetails, Premiere, ScoreItem, Scores, TmdbMovie, TmEpisode, TmShow } from "./types";
+import type { AniDetails, AniMedia, AnimeEpisode, Anticipated, HomeMovie, MovieDetails, Premiere, ScoreItem, Scores, TmdbMovie, TmEpisode, TmShow } from "./types";
 import { addDays, seasonOf, usToday } from "./dates";
 
 export class HttpError extends Error {
@@ -165,6 +165,24 @@ export function animeUpcoming(): Promise<AniMedia[]> {
       media(status: NOT_YET_RELEASED, type: ANIME, sort: POPULARITY_DESC, isAdult: false) { ${ANI_FIELDS} startDate { year month day } } } }`;
     const r = await ani<{ Page: { media: AniMedia[] } }>(q);
     return r.Page.media.filter((m) => ANIME_FORMATS.has(m.format ?? "") || m.format === "MOVIE");
+  });
+}
+
+/** Procura animes pelo nome (AniList). */
+export async function searchAnime(q: string): Promise<AniMedia[]> {
+  const query = `query ($q: String) { Page(page: 1, perPage: 20) {
+    media(search: $q, type: ANIME, isAdult: false, sort: SEARCH_MATCH) { ${ANI_FIELDS} startDate { year month day } nextAiringEpisode { episode airingAt } } } }`;
+  const r = await ani<{ Page: { media: AniMedia[] } }>(query, { q });
+  return r.Page.media;
+}
+
+/** Tudo o que a página do anime mostra; cache de 12 horas. */
+export function animeDetails(id: number): Promise<AniDetails> {
+  return cached(`anime:${id}`, 12 * 3600_000, async () => {
+    const query = `query ($id: Int) { Media(id: $id, type: ANIME) { ${ANI_FIELDS} idMal bannerImage description(asHtml: false) season seasonYear duration
+      startDate { year month day } nextAiringEpisode { episode airingAt } studios(isMain: true) { nodes { name } } externalLinks { site url type } } }`;
+    const r = await ani<{ Media: AniDetails }>(query, { id });
+    return r.Media;
   });
 }
 

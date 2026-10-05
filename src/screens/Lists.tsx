@@ -4,7 +4,7 @@ import { MovieButtons } from "./Movies";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import type { AniMedia, AnimeEpisode, HomeMovie, Premiere, TmdbMovie } from "../data/types";
 import {
-  aniTitle, animeSchedule, animeSeason, animeUpcoming, anticipatedHome, friendlyError, homeReleases, scoresForMovie, premieres, searchMovies, tmdbPoster,
+  aniTitle, animeSchedule, animeSeason, animeUpcoming, searchAnime, anticipatedHome, friendlyError, homeReleases, scoresForMovie, premieres, searchMovies, tmdbPoster,
 } from "../data/api";
 import { followAnime, followById, setWatched, markWatched, toMovieEntry, useStore } from "../data/store";
 import { agendaEpisodes, type AgendaEpisode } from "../data/selectors";
@@ -146,7 +146,7 @@ function AnimeEpisodeRow({ e }: { e: AnimeEpisode }) {
   const t = ptDayTime(new Date(e.airingAt * 1000));
   const m = e.media;
   return (
-    <a className="row" href={m.siteUrl ?? undefined} target="_blank" rel="noopener">
+    <Link className="row" to={`/anime/${m.id}`}>
       <span className="time">{t.time}</span>
       <Poster src={m.coverImage?.large ?? m.coverImage?.medium} large={m.coverImage?.extraLarge} title={aniTitle(m)} width={44} />
       <span className="body">
@@ -156,7 +156,7 @@ function AnimeEpisodeRow({ e }: { e: AnimeEpisode }) {
         </span>
       </span>
       {m.averageScore != null && <AniScore score={m.averageScore} />}
-    </a>
+    </Link>
   );
 }
 
@@ -164,7 +164,10 @@ type AnimeSort = "airing" | "pop" | "top";
 
 /** Descobrir anime: mais aguardados e a temporada atual. */
 export function AnimeDiscover() {
-  const [sort, setSort] = useState<AnimeSort>("airing");
+  const [sort, setSort] = useSessionState<AnimeSort>("sort:anime", "airing");
+  const [q, setQ] = useSessionState("q:anime", "");
+  const nav = useNavigate();
+  const results = useAsync(() => (q.trim().length >= 2 ? new Promise<AniMedia[]>((res, rej) => setTimeout(() => searchAnime(q.trim()).then(res, rej), 350)) : Promise.resolve(null)), [q]);
   const season = useAsync(() => animeSeason(), []);
   const upcoming = useAsync(() => animeUpcoming(), []);
   const links = useStore((s) => s.animeLinks);
@@ -186,14 +189,16 @@ export function AnimeDiscover() {
     return (
       <div className="row" key={m.id}>
         <Poster src={m.coverImage?.large ?? m.coverImage?.medium} large={m.coverImage?.extraLarge} title={aniTitle(m)} width={52} />
-        <a className="body" href={m.siteUrl ?? undefined} target="_blank" rel="noopener">
+        <Link className="body" to={`/anime/${m.id}`}>
           <span className="title clamp2">{aniTitle(m)}</span>
           {n && t && <span className="small primary-text">Ep {n.episode}{m.episodes ? ` de ${m.episodes}` : ""} · {t.label}</span>}
+          {!n && m.status === "NOT_YET_RELEASED" && <span className="small primary-text">Estreia {dateLabel(m) ?? "por anunciar"}</span>}
+          {!n && m.status === "FINISHED" && <span className="small muted">Terminado{m.startDate?.year ? ` · ${m.startDate.year}` : ""}</span>}
           <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
             {m.averageScore != null && <AniScore score={m.averageScore} />}
             <span className="small muted clamp1">{(m.genres ?? []).slice(0, 2).join(", ")}</span>
           </span>
-        </a>
+        </Link>
         <FollowButton followed={followed} loading={!!pending[`a${m.id}`]} onClick={() => followAnime(m, aniTitle(m))} />
       </div>
     );
@@ -202,11 +207,25 @@ export function AnimeDiscover() {
   const groups = sort === "airing" ? groupBy(list, (m) => ptDayTime(new Date(m.nextAiringEpisode!.airingAt * 1000)).day) : null;
   return (
     <>
+      <div className="search" style={{ marginTop: 14 }}>
+        <Search size={19} className="muted" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Procurar um anime" aria-label="Procurar um anime" />
+        {q && <button aria-label="Limpar pesquisa" onClick={() => setQ("")}><X size={18} /></button>}
+      </div>
+      {q.trim().length >= 2 && (
+        <>
+          {results.loading && <Spinner />}
+          {results.error != null && <Empty title="Sem resultados" body={friendlyError(results.error)} />}
+          {results.data && !results.data.length && <Empty title="Sem resultados" body="Não encontrei nenhum anime com esse nome. Experimenta o nome em japonês (romaji) ou em inglês." />}
+          <div className="rows two" style={{ marginTop: 14 }}>{(results.data ?? []).map(row)}</div>
+        </>
+      )}
+      {q.trim().length < 2 && <>
       <p className="eyebrow" style={{ marginTop: 14 }}>Temporada de {SEASON_PT[sn]} {year} · horas de Portugal · dados AniList</p>
       <Carousel title="Mais aguardados" items={(upcoming.data ?? []).map((m, i) => ({
         key: `u${m.id}`, title: aniTitle(m), image: m.coverImage?.extraLarge ?? m.coverImage?.large, large: m.coverImage?.extraLarge,
         line1: dateLabel(m) ?? "Data por anunciar", line2: m.format === "MOVIE" ? "Filme" : m.format === "ONA" ? "Streaming" : "Série",
-        rank: i + 1, href: m.siteUrl ?? undefined,
+        rank: i + 1, onClick: () => nav(`/anime/${m.id}`),
       }))} />
       <h2 className="h2">Esta temporada</h2>
       <Chips value={sort} onChange={setSort} options={[{ value: "airing", label: "No ar" }, { value: "pop", label: "Populares" }, { value: "top", label: "Mais bem avaliados" }]} />
@@ -215,6 +234,7 @@ export function AnimeDiscover() {
       {groups
         ? groups.map(([day, items]) => <Fragment key={day}><DayHeader date={day} today={today} /><div className="rows two">{items.map(row)}</div></Fragment>)
         : <div className="rows two" style={{ marginTop: 12 }}>{list.map(row)}</div>}
+      </>}
     </>
   );
 }

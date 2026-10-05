@@ -127,6 +127,17 @@ export interface AniMedia {
   isAdult?: boolean;
   startDate?: { year?: number | null; month?: number | null; day?: number | null } | null;
 }
+/** Detalhes de um anime para a página do anime. */
+export interface AniDetails extends AniMedia {
+  bannerImage?: string | null;
+  description?: string | null;
+  season?: string | null;
+  seasonYear?: number | null;
+  duration?: number | null;
+  studios?: { nodes: { name: string }[] } | null;
+  externalLinks?: { site: string; url: string; type?: string | null }[] | null;
+  idMal?: number | null;
+}
 export interface AnimeEpisode { episode: number; airingAt: number; media: AniMedia }
 
 // ---- TMDB ----

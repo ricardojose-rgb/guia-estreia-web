@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { HashRouter, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { CalendarDays, CirclePlay, Clapperboard, Compass, Library, RefreshCw, Settings as Cog } from "lucide-react";
 import { MoviePage, MyMovies } from "./screens/Movies";
+import { AnimePage } from "./screens/Anime";
 import { refreshAll, useStore } from "./data/store";
 import { Segmented, Toasts } from "./ui/components";
 import { ScrollMemory } from "./ui/memory";
@@ -83,7 +84,7 @@ function SyncBadge() {
 
 function Shell() {
   const loc = useLocation();
-  const isShow = loc.pathname.startsWith("/serie/") || loc.pathname.startsWith("/filme/");
+  const isShow = loc.pathname.startsWith("/serie/") || loc.pathname.startsWith("/filme/") || loc.pathname.startsWith("/anime/");
   return (
     <div className="app">
       <ScrollMemory />
@@ -108,6 +109,7 @@ function Shell() {
           <Route path="/serie/:id" element={<div className="page"><ShowPage /></div>} />
           <Route path="/filmes" element={<Page title="Os meus filmes"><MyMovies /></Page>} />
           <Route path="/filme/:id" element={<div className="page"><MoviePage /></div>} />
+          <Route path="/anime/:id" element={<div className="page"><AnimePage /></div>} />
         </Routes>
       </main>
       {!isShow && (
