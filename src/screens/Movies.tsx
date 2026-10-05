@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { openResolved, rtSearch, rtUrl } from "../data/links";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Bookmark, BookmarkCheck, Check, ExternalLink } from "lucide-react";
 import type { MovieDetails, MovieEntry, Scores } from "../data/types";
@@ -139,7 +140,6 @@ export function MoviePage() {
   if (!d.data || !entry) return <Spinner />;
   const m = d.data;
   const st = homeStatus(m, today, year);
-  const q = encodeURIComponent(m.title);
   const dates = [
     m.theatricalDate && ["Cinema", m.theatricalDate],
     m.digitalDate && ["Digital", m.digitalDate],
@@ -157,7 +157,7 @@ export function MoviePage() {
           <div className="info">
             <h1>{m.title}</h1>
             <span className="muted">{[m.year, m.runtime ? `${Math.floor(m.runtime / 60)} h ${m.runtime % 60} min` : null, m.genres.slice(0, 3).join(", ")].filter(Boolean).join(" · ")}</span>
-            <ScoreChips scores={scores} title={m.title} />
+            <ScoreChips scores={scores} title={m.originalTitle || m.title} ids={{ imdb: m.imdbId, tmdbMovie: m.id }} />
             {st.text && <span style={{ fontWeight: 800, color: st.ready ? "var(--new)" : "var(--primary)" }}>{st.ready ? "✓ " : ""}{st.text}</span>}
             <MovieButtons entry={entry} />
           </div>
@@ -199,8 +199,9 @@ export function MoviePage() {
       )}
 
       <div style={{ display: "flex", gap: 4, flexWrap: "wrap", margin: "18px -12px 0" }}>
-        <a className="btn ghost" href={`https://www.rottentomatoes.com/search?search=${q}`} target="_blank" rel="noopener">Rotten Tomatoes <ExternalLink size={14} /></a>
-        <a className="btn ghost" href={`https://www.justwatch.com/pt/pesquisa?q=${q}`} target="_blank" rel="noopener">Onde ver (JustWatch) <ExternalLink size={14} /></a>
+        <a className="btn ghost" href={rtSearch(m.originalTitle || m.title)} target="_blank" rel="noopener"
+          onClick={(e) => openResolved(e, () => rtUrl({ imdb: m.imdbId, tmdbMovie: m.id }, m.originalTitle || m.title))}>Rotten Tomatoes <ExternalLink size={14} /></a>
+        <a className="btn ghost" href={`https://www.themoviedb.org/movie/${m.id}/watch?locale=PT`} target="_blank" rel="noopener">Onde ver em Portugal <ExternalLink size={14} /></a>
         {m.imdbId && <a className="btn ghost" href={`https://www.imdb.com/title/${m.imdbId}/`} target="_blank" rel="noopener">IMDb <ExternalLink size={14} /></a>}
         <a className="btn ghost" href={`https://www.themoviedb.org/movie/${m.id}`} target="_blank" rel="noopener">TMDB <ExternalLink size={14} /></a>
       </div>

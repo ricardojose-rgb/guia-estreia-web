@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { openResolved, rtSearch, rtUrl, watchUrl } from "../data/links";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Check, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 import type { Episode, Scores, TmShow } from "../data/types";
 import { channelOf, friendlyError, scoresForShow, TvMaze } from "../data/api";
-import { catchUp, follow, markWatched, setWatched, toEpisodes, unfollow, useStore } from "../data/store";
+import { catchUp, follow, getState, markWatched, setWatched, toEpisodes, unfollow, useStore } from "../data/store";
 import { episodeCode, episodeTitle, ptAirTime, relativeDay, shortDate, statusPt, stripHtml, usToday } from "../data/dates";
 import { Empty, Poster, ScoreChips, Spinner } from "../ui/components";
 
@@ -51,7 +52,6 @@ export default function ShowPage() {
   const next = episodes.filter((e) => e.airdate && e.airdate > today).sort((a, b) => a.airdate!.localeCompare(b.airdate!))[0];
   const behind = episodes.filter((e) => e.season > 0 && e.airdate && e.airdate <= today && !watched[e.id]).length;
   const summary = stripHtml(show.summary);
-  const q = encodeURIComponent(show.name);
   const lastSeason = seasons[0]?.[0];
 
   return (
@@ -66,7 +66,7 @@ export default function ShowPage() {
             <h1>{show.name}</h1>
             <span className="muted">{[show.premiered?.slice(0, 4), channelOf(show), statusPt(show.status)].filter(Boolean).join(" · ")}</span>
             {!!show.genres?.length && <span className="muted small">{show.genres.join(", ")}</span>}
-            <ScoreChips scores={scores} title={show.name} />
+            <ScoreChips scores={scores} title={show.name} ids={{ imdb: show.externals?.imdb, tvmaze: id }} />
             {next && (
               <span className="primary-text" style={{ fontWeight: 800 }}>
                 Próximo: {episodeCode(next.season, next.number)} · {relativeDay(next.airdate!, today)} (EUA)
@@ -85,8 +85,10 @@ export default function ShowPage() {
 
       {summary && <p style={{ maxWidth: "72ch", fontSize: 15, lineHeight: 1.6 }}>{summary}</p>}
       <div style={{ display: "flex", gap: 4, flexWrap: "wrap", margin: "0 -12px" }}>
-        <a className="btn ghost" href={`https://www.rottentomatoes.com/search?search=${q}`} target="_blank" rel="noopener">Rotten Tomatoes <ExternalLink size={14} /></a>
-        <a className="btn ghost" href={`https://www.justwatch.com/pt/pesquisa?q=${q}`} target="_blank" rel="noopener">Onde ver (JustWatch) <ExternalLink size={14} /></a>
+        <a className="btn ghost" href={rtSearch(show.name)} target="_blank" rel="noopener"
+          onClick={(e) => openResolved(e, () => rtUrl({ imdb: show.externals?.imdb, tvmaze: id }, show.name))}>Rotten Tomatoes <ExternalLink size={14} /></a>
+        <a className="btn ghost" href={`https://www.google.com/search?q=${encodeURIComponent(show.name + " site:justwatch.com/pt")}`} target="_blank" rel="noopener"
+          onClick={(e) => openResolved(e, () => watchUrl({ imdb: show.externals?.imdb, tvmaze: id }, show.name, "tv", getState().prefs.tmdbToken))}>Onde ver em Portugal <ExternalLink size={14} /></a>
         {show.externals?.imdb && <a className="btn ghost" href={`https://www.imdb.com/title/${show.externals.imdb}/`} target="_blank" rel="noopener">IMDb <ExternalLink size={14} /></a>}
       </div>
       {!followed && episodes.length > 0 && <p className="small muted">Segue a série para marcares os episódios que já viste.</p>}

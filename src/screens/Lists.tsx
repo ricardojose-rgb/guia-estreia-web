@@ -328,7 +328,7 @@ function MovieRow({ m, omdb, mdb, year, showDate }: { m: HomeMovie; omdb: string
         </span>
         <span className="title clamp2">{m.title}</span>
         <span className="small muted clamp1">{parts}</span>
-        <ScoreChips scores={scores} title={m.title} />
+        <ScoreChips scores={scores} title={m.original_title || m.title} ids={{ tmdbMovie: m.id }} />
         {m.providersPT.length > 0 && (
           <span className="small" style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
             <span className="muted">Em Portugal:</span>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { openResolved, rtSearch, rtUrl, type Ids } from "../data/links";
 import { Check, ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
 import { largeImage } from "../data/api";
 import { dismissToast, useStore } from "../data/store";
@@ -135,7 +136,7 @@ const SCORE_META: Record<string, { label: string; title: string }> = {
   myanimelist: { label: "MAL", title: "MyAnimeList" },
 };
 
-function ScoreItemChip({ it, imdbId, rtQuery }: { it: import("../data/types").ScoreItem; imdbId?: string | null; rtQuery?: string }) {
+function ScoreItemChip({ it, imdbId, rtQuery, ids }: { it: import("../data/types").ScoreItem; imdbId?: string | null; rtQuery?: string; ids?: Ids }) {
   const meta = SCORE_META[it.source] ?? { label: it.source, title: it.source };
   const votes = it.votes ? ` · ${it.votes.toLocaleString("pt-PT")} votos` : "";
   let cls = "score tm", icon = "";
@@ -144,19 +145,22 @@ function ScoreItemChip({ it, imdbId, rtQuery }: { it: import("../data/types").Sc
   else if (it.source === "popcorn") { cls = `score pop ${it.pct >= 60 ? "fresh" : "rotten"}`; icon = "🍿"; }
   else if (it.source === "metacritic") cls = `score mc ${it.pct >= 61 ? "good" : it.pct >= 40 ? "mixed" : "bad"}`;
   const href = it.source === "imdb" && imdbId ? `https://www.imdb.com/title/${imdbId}/`
-    : (it.source === "tomatoes" || it.source === "popcorn") && rtQuery ? `https://www.rottentomatoes.com/search?search=${encodeURIComponent(rtQuery)}` : undefined;
+    : (it.source === "tomatoes" || it.source === "popcorn") && rtQuery ? rtSearch(rtQuery) : undefined;
+  const isRt = it.source === "tomatoes" || it.source === "popcorn";
   const inner = <>{icon && <span aria-hidden="true">{icon}</span>}{meta.label && <small>{meta.label.toUpperCase()}</small>}{it.text}</>;
+  const rtIds: Ids = { ...ids, imdb: ids?.imdb ?? imdbId };
   return href
-    ? <a className={cls} href={href} target="_blank" rel="noopener" title={meta.title + votes}>{inner}</a>
+    ? <a className={cls} href={href} target="_blank" rel="noopener" title={meta.title + votes}
+        onClick={isRt && rtQuery ? (e) => { e.stopPropagation(); openResolved(e, () => rtUrl(rtIds, rtQuery)); } : (e) => e.stopPropagation()}>{inner}</a>
     : <span className={cls} title={meta.title + votes}>{inner}</span>;
 }
 
-export function ScoreChips({ scores, title }: { scores: Scores | null | undefined; title?: string }) {
+export function ScoreChips({ scores, title, ids }: { scores: Scores | null | undefined; title?: string; ids?: Ids }) {
   if (!scores) return null;
   if (scores.all?.length) {
     return (
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        {scores.all.filter((it) => it.source !== "trakt").map((it) => <ScoreItemChip key={it.source} it={it} imdbId={scores.imdbId} rtQuery={title} />)}
+        {scores.all.filter((it) => it.source !== "trakt").map((it) => <ScoreItemChip key={it.source} it={it} imdbId={scores.imdbId} rtQuery={title} ids={ids} />)}
       </div>
     );
   }
