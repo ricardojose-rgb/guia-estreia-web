@@ -2,7 +2,7 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Check, ExternalLink } from "lucide-react";
 import { useEffect } from "react";
-import { aniTitle, animeDetails, friendlyError } from "../data/api";
+import { aniTitle, animeDetails, animeTvmazeId, friendlyError } from "../data/api";
 import { followAnime, unfollow, useStore } from "../data/store";
 import { MONTHS_SHORT, ptDayTime, SEASON_PT } from "../data/dates";
 import { AniScore, Empty, Poster, Spinner, useAsync } from "../ui/components";
@@ -28,13 +28,19 @@ export function AnimePage() {
   const id = Number(useParams().id);
   const nav = useNavigate();
   const d = useAsync(() => animeDetails(id), [id]);
+  const known = useStore((s) => s.animeLinks[id]);
+  // Como nas séries: abre logo a página dos episódios. Só fica aqui se o anime ainda não estiver no TVmaze.
+  const tv = useAsync(async () => known ?? (d.data ? await animeTvmazeId(d.data).catch(() => null) : undefined), [d.data, known]);
+  useEffect(() => {
+    if (tv.data) nav(`/serie/${tv.data}?ani=${id}`, { replace: true });
+  }, [tv.data, id, nav]);
   const linked = useStore((s) => s.animeLinks[id]);
   const followed = useStore((s) => !!(s.animeLinks[id] && s.shows[s.animeLinks[id]]));
   const pending = useStore((s) => !!s.pending[`a${id}`]);
   useEffect(() => { window.scrollTo(0, 0); }, [id]);
 
   if (d.error) return <Empty title="Não foi possível abrir o anime" body={friendlyError(d.error)} action={<button className="btn tonal" onClick={d.reload}>Tentar outra vez</button>} />;
-  if (!d.data) return <Spinner />;
+  if (!d.data || tv.loading || tv.data) return <Spinner />;
   const m = d.data;
   const title = aniTitle(m);
   const next = m.nextAiringEpisode;
@@ -80,6 +86,7 @@ export function AnimePage() {
         </div>
       </div>
 
+      <p className="small muted">Este anime ainda não tem guia de episódios. Assim que tiver (normalmente perto da estreia), carregar nele abre logo os episódios.</p>
       {desc && <p style={{ maxWidth: "72ch", fontSize: 15, lineHeight: 1.6, whiteSpace: "pre-line" }}>{desc}</p>}
 
       {streaming.length > 0 && (

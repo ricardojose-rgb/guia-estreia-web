@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { openResolved, rtSearch, rtUrl, watchUrl } from "../data/links";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Check, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 import type { Episode, Scores, TmShow } from "../data/types";
 import { channelOf, friendlyError, scoresForShow, TvMaze } from "../data/api";
@@ -10,6 +10,7 @@ import { Empty, Poster, ScoreChips, Spinner } from "../ui/components";
 
 export default function ShowPage() {
   const id = Number(useParams().id);
+  const aniId = Number(new URLSearchParams(useLocation().search).get("ani")) || undefined;
   const nav = useNavigate();
   const followed = useStore((s) => !!s.shows[id]);
   const localEps = useStore((s) => s.episodes[id]);
@@ -76,7 +77,7 @@ export default function ShowPage() {
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
               {followed
                 ? <button className="btn tonal" onClick={() => unfollow(id)}><Check size={17} strokeWidth={3} />A seguir</button>
-                : <button className="btn filled" disabled={pending} onClick={() => follow(show)}>{pending ? "A adicionar…" : "Seguir"}</button>}
+                : <button className="btn filled" disabled={pending} onClick={() => follow(show, aniId)}>{pending ? "A adicionar…" : "Seguir"}</button>}
               {followed && behind > 0 && <button className="btn ghost" onClick={() => catchUp(id)}>Já vi tudo até hoje</button>}
             </div>
           </div>

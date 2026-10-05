@@ -154,11 +154,13 @@ async function refreshShow(id: number) {
   setState((s) => ({ episodes: { ...s.episodes, [id]: eps } }), false);
 }
 
-export async function follow(show: TmShow) {
+export async function follow(show: TmShow, aniId?: number) {
   const key = `t${show.id}`;
   setPending(key, true);
   try {
-    setState((s) => ({ shows: { ...s.shows, [show.id]: toShow(show) }, removed: without(s.removed, show.id) }));
+    // Se veio de um anime, guarda a ligação para ficar no separador Anime
+    setState((s) => ({ shows: { ...s.shows, [show.id]: toShow(show) }, removed: without(s.removed, show.id),
+      ...(aniId ? { animeLinks: { ...s.animeLinks, [aniId]: show.id } } : {}) }));
     await refreshShow(show.id).catch(() => {});
     say(`✓ A seguir ${show.name}`);
   } finally { setPending(key, false); }

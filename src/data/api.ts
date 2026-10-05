@@ -197,6 +197,11 @@ export function cleanAnimeTitle(t: string): string {
     .trim();
 }
 
+/** Id do TVmaze de um anime (procura uma vez e guarda durante 3 dias; null se ainda não existir). */
+export function animeTvmazeId(m: AniMedia): Promise<number | null> {
+  return cached(`anitv:${m.id}`, 3 * 86400_000, async () => (await findAnimeShow(m))?.id ?? null);
+}
+
 /** Encontra no TVmaze a série correspondente a um anime. */
 export async function findAnimeShow(m: AniMedia): Promise<TmShow | null> {
   const names = [m.title.english, m.title.romaji].filter(Boolean) as string[];
