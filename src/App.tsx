@@ -4,6 +4,7 @@ import { CalendarDays, CirclePlay, Clapperboard, Compass, Library, RefreshCw, Se
 import { MoviePage, MyMovies } from "./screens/Movies";
 import { refreshAll, useStore } from "./data/store";
 import { Segmented, Toasts } from "./ui/components";
+import { ScrollMemory } from "./ui/memory";
 import UpNextScreen from "./screens/UpNext";
 import MyShows from "./screens/MyShows";
 import ShowPage from "./screens/ShowPage";
@@ -85,6 +86,7 @@ function Shell() {
   const isShow = loc.pathname.startsWith("/serie/") || loc.pathname.startsWith("/filme/");
   return (
     <div className="app">
+      <ScrollMemory />
       <aside className="sidebar">
         <div className="brand"><img src="./icon.svg" alt="" />Guia de Estreias</div>
         {NAV.map(({ to, label, icon: Icon, end }) => (

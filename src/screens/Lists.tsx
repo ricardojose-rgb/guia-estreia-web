@@ -9,6 +9,7 @@ import {
 import { followAnime, followById, setWatched, markWatched, toMovieEntry, useStore } from "../data/store";
 import { agendaEpisodes, type AgendaEpisode } from "../data/selectors";
 import { addDays, episodeCode, episodeTitle, MONTHS_SHORT, ptAirTime, ptDayTime, ptToday, SEASON_PT, seasonOf, shortDate, usToday } from "../data/dates";
+import { useSessionState } from "../ui/memory";
 import { AniScore, Carousel, Chips, DayHeader, Empty, FollowButton, Poster, ScoreChips, Spinner, Tag, useAsync } from "../ui/components";
 import { Check } from "lucide-react";
 
@@ -235,7 +236,7 @@ export function MoviesList({ withAnticipated = false }: { withAnticipated?: bool
   const nav = useNavigate();
   const movies = useAsync(() => (token ? homeReleases(token) : Promise.resolve([] as HomeMovie[])), [token]);
   const ant = useAsync(() => (token && withAnticipated ? anticipatedHome(token) : Promise.resolve([] as HomeMovie[])), [token, withAnticipated]);
-  const [q, setQ] = useState("");
+  const [q, setQ] = useSessionState("q:movies", "");
   const results = useAsync(() => (q.trim().length >= 2 ? new Promise<TmdbMovie[]>((res, rej) => setTimeout(() => searchMovies(token, q.trim()).then(res, rej), 350)) : Promise.resolve(null)), [q]);
   const today = usToday();
   const year = Number(today.slice(0, 4));

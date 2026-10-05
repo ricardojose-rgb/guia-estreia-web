@@ -7,10 +7,11 @@ import { follow, say, useStore } from "../data/store";
 import { shortDate, statusPt, usToday } from "../data/dates";
 import { Carousel, Empty, FollowButton, Poster, Spinner, useAsync } from "../ui/components";
 import { PremiereRow } from "./Lists";
+import { useSessionState } from "../ui/memory";
 import { Link } from "react-router-dom";
 
 export function SeriesDiscover() {
-  const [q, setQ] = useState("");
+  const [q, setQ] = useSessionState("q:series", "");
   const [results, setResults] = useState<{ loading: boolean; error?: unknown; hits?: TmShow[] } | null>(null);
   const shows = useStore((s) => s.shows);
   const pending = useStore((s) => s.pending);

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { carouselPos } from "./memory";
 import { openResolved, rtSearch, rtUrl, type Ids } from "../data/links";
 import { Check, ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
 import { largeImage } from "../data/api";
@@ -195,6 +196,12 @@ export function Carousel({ title, items }: { title: string; items: CarouselItem[
     if (!el) return;
     setEdges({ start: el.scrollLeft <= 4, end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 4 });
   }, []);
+  // Repor a posição horizontal ao voltar à página
+  useEffect(() => {
+    const el = ref.current, x = carouselPos.get(title);
+    if (el && x && items.length) { el.scrollLeft = x; update(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items.length > 0]);
   useEffect(() => {
     update();
     const el = ref.current;
@@ -213,7 +220,7 @@ export function Carousel({ title, items }: { title: string; items: CarouselItem[
       <h2 className="h2">{title}</h2>
       {!edges.start && <button className="car-arrow left" aria-label="Anterior" onClick={() => page(-1)}><ChevronLeft size={24} /></button>}
       {!edges.end && <button className="car-arrow right" aria-label="Seguinte" onClick={() => page(1)}><ChevronRight size={24} /></button>}
-      <div className="carousel" ref={ref} onScroll={update}>
+      <div className="carousel" ref={ref} onScroll={() => { update(); if (ref.current) carouselPos.set(title, ref.current.scrollLeft); }}>
         {items.map((it) => {
           const inner = (
             <>
