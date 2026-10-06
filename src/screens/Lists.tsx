@@ -56,7 +56,7 @@ export function SeriesAgenda() {
       {behind.length > 0 && (filter === "all" || filter === "mine") && (
         <>
           <h2 className="h2">Por ver · últimos 7 dias</h2>
-          <div className="rows two">{behind.map((e) => <EpisodeRow key={`b${e.id}`} e={e} hide={hide} today={today} />)}</div>
+          <div className="rows cards">{behind.map((e) => <EpisodeRow key={`b${e.id}`} e={e} hide={hide} today={today} />)}</div>
         </>
       )}
       {!rows.length && !prem.loading && (
@@ -67,7 +67,7 @@ export function SeriesAgenda() {
       {groups.map(([date, items]) => (
         <Fragment key={date}>
           <DayHeader date={date} today={today} />
-          <div className="rows two">
+          <div className="rows cards">
             {items.map((r) => r.ep
               ? <EpisodeRow key={`e${r.ep.id}`} e={r.ep} hide={hide} today={today} />
               : <PremiereRow key={`p${r.p!.showId}-${r.p!.season}`} p={r.p!} followed={!!shows[r.p!.showId]} loading={!!pending[`t${r.p!.showId}`]} />)}
@@ -84,8 +84,8 @@ function EpisodeRow({ e, hide, today }: { e: AgendaEpisode; hide: boolean; today
   const pt = ptAirTime(e.airstamp, e.airtime);
   return (
     <div className="row">
-      <Poster src={e.show.imageUrl} large={e.show.imageLarge} title={e.show.name} channel={e.show.channel} width={48} />
       <Link to={`/serie/${e.showId}`} className="body">
+        <Poster src={e.show.imageUrl} large={e.show.imageLarge} title={e.show.name} channel={e.show.channel} width="100%" zoomable={false} />
         <span><Tag kind="mine">Sigo</Tag></span>
         <span className="title clamp1">{e.show.name}</span>
         <span className="small muted clamp1">{[episodeCode(e.season, e.number), episodeTitle(e.name, hide && !e.watched), e.show.channel].filter(Boolean).join(" · ")}</span>
@@ -104,8 +104,8 @@ function EpisodeRow({ e, hide, today }: { e: AgendaEpisode; hide: boolean; today
 export function PremiereRow({ p, followed, loading }: { p: Premiere; followed: boolean; loading: boolean }) {
   return (
     <div className="row">
-      <Poster src={p.imageUrl} title={p.title} channel={p.channel} width={48} />
       <Link to={`/serie/${p.showId}`} className="body">
+        <Poster src={p.imageUrl} title={p.title} channel={p.channel} width="100%" zoomable={false} />
         <span>{followed ? <Tag kind="mine">Sigo</Tag> : p.isNew ? <Tag kind="new">Nova série</Tag> : <Tag kind="ret">Temporada {p.season}</Tag>}</span>
         <span className="title clamp1">{p.title}</span>
         <span className="small muted clamp1">{[p.isNew ? "Estreia" : "Regressa", p.channel].filter(Boolean).join(" · ")}</span>
@@ -134,7 +134,7 @@ export function AnimeAgenda() {
       {groups.map(([day, items]) => (
         <Fragment key={day}>
           <DayHeader date={day} today={today} />
-          <div className="rows two">{items.map((e) => <AnimeEpisodeRow key={`${e.media.id}-${e.episode}`} e={e} />)}</div>
+          <div className="rows cards">{items.map((e) => <AnimeEpisodeRow key={`${e.media.id}-${e.episode}`} e={e} />)}</div>
         </Fragment>
       ))}
       {sched.data && <p className="small muted" style={{ marginTop: 28 }}>Dados: AniList. As horas são as da estreia no Japão convertidas para Portugal. As plataformas de streaming podem disponibilizar o episódio mais tarde.</p>}
@@ -147,9 +147,9 @@ function AnimeEpisodeRow({ e }: { e: AnimeEpisode }) {
   const m = e.media;
   return (
     <Link className="row" to={`/anime/${m.id}`}>
-      <span className="time">{t.time}</span>
-      <Poster src={m.coverImage?.large ?? m.coverImage?.medium} large={m.coverImage?.extraLarge} title={aniTitle(m)} width={44} />
       <span className="body">
+        <Poster src={m.coverImage?.large ?? m.coverImage?.medium} large={m.coverImage?.extraLarge} title={aniTitle(m)} width="100%" zoomable={false} />
+        <span className="time">{t.time}</span>
         <span className="title clamp2" style={{ fontSize: 15 }}>{aniTitle(m)}</span>
         <span className="small" style={{ color: e.episode === 1 ? "var(--new)" : "var(--muted)" }}>
           {e.episode === 1 ? "Estreia · " : ""}Ep {e.episode}{m.episodes ? ` de ${m.episodes}` : ""}
@@ -188,8 +188,8 @@ export function AnimeDiscover() {
     const t = n ? ptDayTime(new Date(n.airingAt * 1000)) : null;
     return (
       <div className="row" key={m.id}>
-        <Poster src={m.coverImage?.large ?? m.coverImage?.medium} large={m.coverImage?.extraLarge} title={aniTitle(m)} width={52} />
         <Link className="body" to={`/anime/${m.id}`}>
+          <Poster src={m.coverImage?.large ?? m.coverImage?.medium} large={m.coverImage?.extraLarge} title={aniTitle(m)} width="100%" zoomable={false} />
           <span className="title clamp2">{aniTitle(m)}</span>
           {n && t && <span className="small primary-text">Ep {n.episode}{m.episodes ? ` de ${m.episodes}` : ""} · {t.label}</span>}
           {!n && m.status === "NOT_YET_RELEASED" && <span className="small primary-text">Estreia {dateLabel(m) ?? "por anunciar"}</span>}
@@ -217,7 +217,7 @@ export function AnimeDiscover() {
           {results.loading && <Spinner />}
           {results.error != null && <Empty title="Sem resultados" body={friendlyError(results.error)} />}
           {results.data && !results.data.length && <Empty title="Sem resultados" body="Não encontrei nenhum anime com esse nome. Experimenta o nome em japonês (romaji) ou em inglês." />}
-          <div className="rows two" style={{ marginTop: 14 }}>{(results.data ?? []).map(row)}</div>
+          <div className="rows cards" style={{ marginTop: 14 }}>{(results.data ?? []).map(row)}</div>
         </>
       )}
       {q.trim().length < 2 && <>
@@ -232,8 +232,8 @@ export function AnimeDiscover() {
       {season.loading && <Spinner />}
       {season.error != null && <Empty title="Não foi possível carregar" body={friendlyError(season.error)} action={<button className="btn tonal" onClick={season.reload}>Tentar outra vez</button>} />}
       {groups
-        ? groups.map(([day, items]) => <Fragment key={day}><DayHeader date={day} today={today} /><div className="rows two">{items.map(row)}</div></Fragment>)
-        : <div className="rows two" style={{ marginTop: 12 }}>{list.map(row)}</div>}
+        ? groups.map(([day, items]) => <Fragment key={day}><DayHeader date={day} today={today} /><div className="rows cards">{items.map(row)}</div></Fragment>)
+        : <div className="rows cards" style={{ marginTop: 12 }}>{list.map(row)}</div>}
       </>}
     </>
   );
@@ -286,11 +286,11 @@ export function MoviesList({ withAnticipated = false }: { withAnticipated?: bool
         <>
           {results.loading && <Spinner />}
           {results.data && !results.data.length && <Empty title="Sem resultados" body="Não encontrei nenhum filme com esse nome." />}
-          <div className="rows two" style={{ marginTop: 14 }}>
+          <div className="rows cards" style={{ marginTop: 14 }}>
             {(results.data ?? []).map((m) => (
               <div className="row" key={m.id}>
-                <Poster src={tmdbPoster(m.poster_path, "w185")} large={tmdbPoster(m.poster_path, "original")} title={m.title} width={52} />
                 <Link className="body" to={`/filme/${m.id}`}>
+                  <Poster src={tmdbPoster(m.poster_path, "w342")} large={tmdbPoster(m.poster_path, "original")} title={m.title} width="100%" zoomable={false} />
                   <span className="title clamp2">{m.title}</span>
                   <span className="small muted">{m.release_date?.slice(0, 4) ?? "Sem data"}</span>
                 </Link>
@@ -314,13 +314,13 @@ export function MoviesList({ withAnticipated = false }: { withAnticipated?: bool
       {groups.map(([date, items]) => (
         <Fragment key={date}>
           <DayHeader date={date} today={today} />
-          <div className="rows two">{items.map((m) => <MovieRow key={m.id} m={m} omdb={omdb} mdb={mdb} year={year} />)}</div>
+          <div className="rows cards">{items.map((m) => <MovieRow key={m.id} m={m} omdb={omdb} mdb={mdb} year={year} />)}</div>
         </Fragment>
       ))}
       {out.length > 0 && (
         <>
           <h2 className="h2">Já disponíveis · últimos 30 dias</h2>
-          <div className="rows two">{out.map((m) => <MovieRow key={m.id} m={m} omdb={omdb} mdb={mdb} year={year} showDate />)}</div>
+          <div className="rows cards">{out.map((m) => <MovieRow key={m.id} m={m} omdb={omdb} mdb={mdb} year={year} showDate />)}</div>
         </>
       )}
       {movies.data && !all.length && <Empty title="Sem filmes" body="Não encontrei filmes a sair em digital ou Blu-ray nas próximas semanas." />}
@@ -340,8 +340,8 @@ function MovieRow({ m, omdb, mdb, year, showDate }: { m: HomeMovie; omdb: string
   ].filter(Boolean).join(" · ");
   return (
     <div className="row">
-      <Poster src={tmdbPoster(m.poster_path, "w185")} large={tmdbPoster(m.poster_path, "original")} title={m.title} width={52} />
       <Link className="body" to={`/filme/${m.id}`}>
+        <Poster src={tmdbPoster(m.poster_path, "w342")} large={tmdbPoster(m.poster_path, "original")} title={m.title} width="100%" zoomable={false} />
         <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {m.digitalDate === m.homeDate && <Tag kind="film">Digital</Tag>}
           {m.physicalDate && <Tag kind="ret">Blu-ray</Tag>}

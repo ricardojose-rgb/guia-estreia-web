@@ -59,11 +59,11 @@ export function SeriesDiscover() {
           {results.loading && <Spinner />}
           {results.error != null && <Empty title="Sem resultados" body={friendlyError(results.error)} />}
           {results.hits && !results.hits.length && <Empty title="Sem resultados" body="Não encontrei nenhuma série com esse nome. Experimenta o título original em inglês." />}
-          <div className="rows two" style={{ marginTop: 14 }}>
+          <div className="rows cards" style={{ marginTop: 14 }}>
             {results.hits?.map((s) => (
               <div className="row" key={s.id}>
-                <Poster src={s.image?.medium} large={s.image?.original} title={s.name} channel={channelOf(s)} width={52} />
                 <Link to={`/serie/${s.id}`} className="body">
+                  <Poster src={s.image?.medium} large={s.image?.original} title={s.name} channel={channelOf(s)} width="100%" zoomable={false} />
                   <span className="title clamp2">{s.name}</span>
                   <span className="small muted clamp1">{[s.premiered?.slice(0, 4), channelOf(s), statusPt(s.status)].filter(Boolean).join(" · ")}</span>
                 </Link>
@@ -105,7 +105,7 @@ function PremiereSection({ title, list, loading, shows, pending }: {
   return (
     <>
       <h2 className="h2">{title}</h2>
-      <div className="rows two">
+      <div className="rows cards">
         {list.map((p) => <PremiereRow key={`${p.showId}-${p.season}`} p={p} followed={!!shows[p.showId]} loading={!!pending[`t${p.showId}`]} />)}
       </div>
     </>
