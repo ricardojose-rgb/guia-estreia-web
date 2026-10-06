@@ -156,12 +156,15 @@ function ScoreItemChip({ it, imdbId, rtQuery, ids }: { it: import("../data/types
     : <span className={cls} title={meta.title + votes}>{inner}</span>;
 }
 
+/** Pontuações que não mostramos. */
+const HIDDEN_SCORES = new Set(["trakt", "tmdb", "letterboxd"]);
+
 export function ScoreChips({ scores, title, ids }: { scores: Scores | null | undefined; title?: string; ids?: Ids }) {
   if (!scores) return null;
   if (scores.all?.length) {
     return (
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        {scores.all.filter((it) => it.source !== "trakt").map((it) => <ScoreItemChip key={it.source} it={it} imdbId={scores.imdbId} rtQuery={title} ids={ids} />)}
+        {scores.all.filter((it) => !HIDDEN_SCORES.has(it.source)).map((it) => <ScoreItemChip key={it.source} it={it} imdbId={scores.imdbId} rtQuery={title} ids={ids} />)}
       </div>
     );
   }
