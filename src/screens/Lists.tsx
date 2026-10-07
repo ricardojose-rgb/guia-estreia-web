@@ -31,11 +31,12 @@ export function SeriesAgenda() {
   const behind = eps.filter((e) => e.airdate! < today && !e.watched);
   const upcoming = eps.filter((e) => e.airdate! >= today);
 
-  type Row = { date: string; ep?: AgendaEpisode; p?: Premiere };
+  type Row = { date: string; ep?: AgendaEpisode[]; p?: Premiere };
   const rows = useMemo<Row[]>(() => {
     const mineKeys = new Set(upcoming.map((e) => `${e.showId}-${e.airdate}`));
     const p = (prem.data ?? []).filter((x) => !mineKeys.has(`${x.showId}-${x.date}`));
-    const mine: Row[] = upcoming.map((e) => ({ date: e.airdate!, ep: e }));
+    // Vários episódios da mesma série no mesmo dia ficam num só cartão
+    const mine: Row[] = groupEpisodes(upcoming, (e) => `${e.showId}-${e.airdate}`).map((g) => ({ date: g[0].airdate!, ep: g }));
     const pr: Row[] = p.map((x) => ({ date: x.date, p: x }));
     const chosen = filter === "all" ? [...mine, ...pr]
       : filter === "mine" ? [...mine, ...pr.filter((r) => shows[r.p!.showId])]
@@ -56,7 +57,7 @@ export function SeriesAgenda() {
       {behind.length > 0 && (filter === "all" || filter === "mine") && (
         <>
           <h2 className="h2">Por ver · últimos 7 dias</h2>
-          <div className="rows cards">{behind.map((e) => <EpisodeRow key={`b${e.id}`} e={e} hide={hide} today={today} />)}</div>
+          <div className="rows cards">{groupEpisodes(behind, (e) => `${e.showId}`).map((g) => <EpisodeRow key={`b${g[0].id}`} eps={g} hide={hide} today={today} />)}</div>
         </>
       )}
       {!rows.length && !prem.loading && (
@@ -69,7 +70,7 @@ export function SeriesAgenda() {
           <DayHeader date={date} today={today} />
           <div className="rows cards">
             {items.map((r) => r.ep
-              ? <EpisodeRow key={`e${r.ep.id}`} e={r.ep} hide={hide} today={today} />
+              ? <EpisodeRow key={`e${r.ep[0].id}`} eps={r.ep} hide={hide} today={today} />
               : <PremiereRow key={`p${r.p!.showId}-${r.p!.season}`} p={r.p!} followed={!!shows[r.p!.showId]} loading={!!pending[`t${r.p!.showId}`]} />)}
           </div>
         </Fragment>
@@ -79,21 +80,41 @@ export function SeriesAgenda() {
   );
 }
 
-function EpisodeRow({ e, hide, today }: { e: AgendaEpisode; hide: boolean; today: string }) {
+/** Junta episódios pela chave (mesma série, ou mesma série e dia), mantendo a ordem. */
+function groupEpisodes(list: AgendaEpisode[], key: (e: AgendaEpisode) => string): AgendaEpisode[][] {
+  const map = new Map<string, AgendaEpisode[]>();
+  for (const e of list) { const k = key(e); (map.get(k) ?? map.set(k, []).get(k)!).push(e); }
+  return [...map.values()].map((g) => g.sort((a, b) => a.season - b.season || (a.number ?? 0) - (b.number ?? 0)));
+}
+
+/** "T1 E1–E4" ou "T1 E9 – T2 E2". */
+function episodeRange(g: AgendaEpisode[]): string {
+  const a = g[0], b = g[g.length - 1];
+  if (a.season === b.season) return `T${a.season} E${a.number ?? "?"}–E${b.number ?? "?"}`;
+  return `${episodeCode(a.season, a.number)} – ${episodeCode(b.season, b.number)}`;
+}
+
+function EpisodeRow({ eps, hide, today }: { eps: AgendaEpisode[]; hide: boolean; today: string }) {
+  const e = eps[0];
+  const many = eps.length > 1;
   const aired = e.airdate! <= today;
+  const allWatched = eps.every((x) => x.watched);
+  const sameDay = eps.every((x) => x.airdate === e.airdate);
   const pt = ptAirTime(e.airstamp, e.airtime);
   return (
     <div className="row" data-anchor={`e-${e.id}`}>
       <Link to={`/serie/${e.showId}`} className="body">
         <Poster src={e.show.imageUrl} large={e.show.imageLarge} title={e.show.name} channel={e.show.channel} width="100%" zoomable={false} />
-        <span><Tag kind="mine">Sigo</Tag></span>
+        <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}><Tag kind="mine">Sigo</Tag>{many && <Tag kind="new">{eps.length} episódios</Tag>}</span>
         <span className="title clamp1">{e.show.name}</span>
-        <span className="small muted clamp1">{[episodeCode(e.season, e.number), episodeTitle(e.name, hide && !e.watched), e.show.channel].filter(Boolean).join(" · ")}</span>
+        <span className="small muted clamp1">{many
+          ? [episodeRange(eps), sameDay ? (aired ? "saíram todos" : "saem todos de uma vez") : null].filter(Boolean).join(" · ")
+          : [episodeCode(e.season, e.number), episodeTitle(e.name, hide && !e.watched), e.show.channel].filter(Boolean).join(" · ")}</span>
         {pt && <span className="small primary-text">Em Portugal: {pt}</span>}
       </Link>
       {aired && (
-        <button className={`check${e.watched ? " on" : ""}`} aria-label={e.watched ? "Marcar como não visto" : "Marcar como visto"}
-          onClick={() => (e.watched ? setWatched(e.showId, [e.id], false) : markWatched(e))}>
+        <button className={`check${allWatched ? " on" : ""}`} aria-label={allWatched ? "Marcar como não visto" : many ? `Marcar os ${eps.length} como vistos` : "Marcar como visto"}
+          onClick={() => (allWatched ? setWatched(e.showId, eps.map((x) => x.id), false) : many ? setWatched(e.showId, eps.filter((x) => !x.watched).map((x) => x.id), true) : markWatched(e))}>
           <Check size={16} strokeWidth={3.2} />
         </button>
       )}
