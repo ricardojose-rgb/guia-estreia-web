@@ -77,7 +77,7 @@ export function MyMovies() {
   const waiting = todo.filter((m) => !homeStatus(details.data?.[m.id], today, year).ready);
 
   const tile = (m: MovieEntry, line: string, accent = false) => (
-    <Link key={m.id} to={`/filme/${m.id}`} className="tile">
+    <Link key={m.id} to={`/filme/${m.id}`} className="tile" data-anchor={`t-${m.id}`}>
       <Poster src={tmdbPoster(m.poster)} large={tmdbPoster(m.poster, "original")} title={m.title} width="100%" zoomable={false} />
       <span className="clamp2" style={{ fontWeight: 800 }}>{m.title}</span>
       <span className="small" style={{ color: accent ? "var(--new)" : "var(--muted)", fontWeight: accent ? 800 : 500 }}>{line}</span>

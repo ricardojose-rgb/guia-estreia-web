@@ -83,7 +83,7 @@ function EpisodeRow({ e, hide, today }: { e: AgendaEpisode; hide: boolean; today
   const aired = e.airdate! <= today;
   const pt = ptAirTime(e.airstamp, e.airtime);
   return (
-    <div className="row">
+    <div className="row" data-anchor={`e-${e.id}`}>
       <Link to={`/serie/${e.showId}`} className="body">
         <Poster src={e.show.imageUrl} large={e.show.imageLarge} title={e.show.name} channel={e.show.channel} width="100%" zoomable={false} />
         <span><Tag kind="mine">Sigo</Tag></span>
@@ -103,7 +103,7 @@ function EpisodeRow({ e, hide, today }: { e: AgendaEpisode; hide: boolean; today
 
 export function PremiereRow({ p, followed, loading }: { p: Premiere; followed: boolean; loading: boolean }) {
   return (
-    <div className="row">
+    <div className="row" data-anchor={`p-${p.showId}-${p.season}`}>
       <Link to={`/serie/${p.showId}`} className="body">
         <Poster src={p.imageUrl} title={p.title} channel={p.channel} width="100%" zoomable={false} />
         <span>{followed ? <Tag kind="mine">Sigo</Tag> : p.isNew ? <Tag kind="new">Nova série</Tag> : <Tag kind="ret">Temporada {p.season}</Tag>}</span>
@@ -146,7 +146,7 @@ function AnimeEpisodeRow({ e }: { e: AnimeEpisode }) {
   const t = ptDayTime(new Date(e.airingAt * 1000));
   const m = e.media;
   return (
-    <Link className="row" to={`/anime/${m.id}`}>
+    <Link className="row" to={`/anime/${m.id}`} data-anchor={`ae-${m.id}-${e.episode}`}>
       <span className="body">
         <Poster src={m.coverImage?.large ?? m.coverImage?.medium} large={m.coverImage?.extraLarge} title={aniTitle(m)} width="100%" zoomable={false} />
         <span className="time">{t.time}</span>
@@ -187,7 +187,7 @@ export function AnimeDiscover() {
     const n = m.nextAiringEpisode;
     const t = n ? ptDayTime(new Date(n.airingAt * 1000)) : null;
     return (
-      <div className="row" key={m.id}>
+      <div className="row" key={m.id} data-anchor={`a-${m.id}`}>
         <Link className="body" to={`/anime/${m.id}`}>
           <Poster src={m.coverImage?.large ?? m.coverImage?.medium} large={m.coverImage?.extraLarge} title={aniTitle(m)} width="100%" zoomable={false} />
           <span className="title clamp2">{aniTitle(m)}</span>
@@ -288,7 +288,7 @@ export function MoviesList({ withAnticipated = false }: { withAnticipated?: bool
           {results.data && !results.data.length && <Empty title="Sem resultados" body="Não encontrei nenhum filme com esse nome." />}
           <div className="rows cards" style={{ marginTop: 14 }}>
             {(results.data ?? []).map((m) => (
-              <div className="row" key={m.id}>
+              <div className="row" key={m.id} data-anchor={`ms-${m.id}`}>
                 <Link className="body" to={`/filme/${m.id}`}>
                   <Poster src={tmdbPoster(m.poster_path, "w342")} large={tmdbPoster(m.poster_path, "original")} title={m.title} width="100%" zoomable={false} />
                   <span className="title clamp2">{m.title}</span>
@@ -339,7 +339,7 @@ function MovieRow({ m, omdb, mdb, year, showDate }: { m: HomeMovie; omdb: string
     m.theatricalDate ? `Cinema ${shortDate(m.theatricalDate, year)}` : null,
   ].filter(Boolean).join(" · ");
   return (
-    <div className="row">
+    <div className="row" data-anchor={`m-${m.id}`}>
       <Link className="body" to={`/filme/${m.id}`}>
         <Poster src={tmdbPoster(m.poster_path, "w342")} large={tmdbPoster(m.poster_path, "original")} title={m.title} width="100%" zoomable={false} />
         <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>

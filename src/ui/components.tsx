@@ -113,7 +113,7 @@ export function Chips<T extends string>({ options, value, onChange }: { options:
 export function DayHeader({ date, today }: { date: string; today: string }) {
   const near = [today].includes(date) || relativeDay(date, today).length < 8;
   return (
-    <div className={`day${date === today ? " today" : ""}`}>
+    <div className={`day${date === today ? " today" : ""}`} data-anchor={`d-${date}`}>
       <span className="label">{relativeDay(date, today)}</span>
       {near && <span className="muted small">{shortDate(date)}</span>}
     </div>
@@ -219,7 +219,7 @@ export function Carousel({ title, items }: { title: string; items: CarouselItem[
   };
   if (!items.length) return null;
   return (
-    <section className={`carousel-wrap${edges.end ? " at-end" : ""}`}>
+    <section className={`carousel-wrap${edges.end ? " at-end" : ""}`} data-anchor={`c-${title}`}>
       <h2 className="h2">{title}</h2>
       {!edges.start && <button className="car-arrow left" aria-label="Anterior" onClick={() => page(-1)}><ChevronLeft size={24} /></button>}
       {!edges.end && <button className="car-arrow right" aria-label="Seguinte" onClick={() => page(1)}><ChevronRight size={24} /></button>}

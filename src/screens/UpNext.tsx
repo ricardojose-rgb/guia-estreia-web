@@ -49,7 +49,7 @@ function Card({ u, hide, today, notStarted }: { u: ReturnType<typeof upNext>[num
     e.runtime ? `${e.runtime} min` : null,
   ].filter(Boolean).join(" · ");
   return (
-    <div className="card upnext">
+    <div className="card upnext" data-anchor={`u-${u.show.id}`}>
       <Poster src={u.show.imageUrl} large={u.show.imageLarge} title={u.show.name} channel={u.show.channel} width={64} />
       <Link to={`/serie/${u.show.id}`} className="body">
         <span className="clamp1" style={{ fontWeight: 800, fontSize: 16 }}>{u.show.name}</span>

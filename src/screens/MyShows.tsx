@@ -62,7 +62,7 @@ export default function MyShows({ kind = "series" }: { kind?: "series" | "anime"
             : next ? `Próximo: ${next === addDays(today, 1) ? "amanhã" : shortDate(next)}`
             : show.status === "Ended" ? "Vista até ao fim" : "Em dia";
           return (
-            <Link key={show.id} to={`/serie/${show.id}`} className="tile">
+            <Link key={show.id} to={`/serie/${show.id}`} className="tile" data-anchor={`t-${show.id}`}>
               <Poster src={show.imageUrl} large={show.imageLarge} title={show.name} channel={show.channel} width="100%" zoomable={false} />
               <span className="clamp2" style={{ fontWeight: 800 }}>{show.name}</span>
               <span className="small" style={{ color: left > 0 ? "var(--primary)" : "var(--muted)" }}>{line}</span>

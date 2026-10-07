@@ -61,7 +61,7 @@ export function SeriesDiscover() {
           {results.hits && !results.hits.length && <Empty title="Sem resultados" body="Não encontrei nenhuma série com esse nome. Experimenta o título original em inglês." />}
           <div className="rows cards" style={{ marginTop: 14 }}>
             {results.hits?.map((s) => (
-              <div className="row" key={s.id}>
+              <div className="row" key={s.id} data-anchor={`s-${s.id}`}>
                 <Link to={`/serie/${s.id}`} className="body">
                   <Poster src={s.image?.medium} large={s.image?.original} title={s.name} channel={channelOf(s)} width="100%" zoomable={false} />
                   <span className="title clamp2">{s.name}</span>
