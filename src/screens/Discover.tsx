@@ -42,7 +42,7 @@ export function SeriesDiscover() {
 
   const toItem = (a: Anticipated) => ({
     key: `${a.tmdbId}-${a.isNew}`, title: a.title, image: a.posterUrl, rank: a.rank, loading: opening === a.tmdbId,
-    line1: [!a.isNew && a.season ? `T${a.season}` : null, a.date ? shortDate(a.date, year) : "Data por anunciar"].filter(Boolean).join(" · "),
+    line1: [!a.isNew && a.season ? `S${String(a.season).padStart(2, "0")}` : null, a.date ? shortDate(a.date, year) : "Data por anunciar"].filter(Boolean).join(" · "),
     line2: a.network, onClick: () => openAnticipated(a),
   });
 

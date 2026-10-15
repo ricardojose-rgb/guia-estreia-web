@@ -271,3 +271,6 @@ a.score:hover { filter: brightness(1.08); }
 .rows.cards .row > .check:not(.on) { background: var(--surface); color: var(--muted); }
 /* Hora do episódio (agenda de anime) sobre o poster */
 .rows.cards .row .time { position: absolute; top: 8px; left: 8px; width: auto; padding: 2px 9px; border-radius: 999px; background: rgba(0,0,0,.72); color: #fff; font-size: 13px; z-index: 2; }
+
+.icon-btn { padding: 8px 10px; }
+@media (max-width: 480px) { .hide-xs { display: none; } .upnext { gap: 10px; } .upnext .btn { padding-left: 12px; padding-right: 12px; } }

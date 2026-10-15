@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
-import { Check } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 import { useMemo } from "react";
-import { markWatched, setWatched, catchUp, useStore } from "../data/store";
+import { markWatched, setWatched, catchUp, say, useStore } from "../data/store";
 import { upNext } from "../data/selectors";
 import { episodeCode, episodeTitle, relativeDay, usToday, addDays } from "../data/dates";
 import { Empty, Poster } from "../ui/components";
@@ -41,6 +41,18 @@ export default function UpNextScreen() {
   );
 }
 
+/** Copia para a área de transferência (com alternativa para navegadores antigos). */
+async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const t = document.createElement("textarea");
+    t.value = text; document.body.appendChild(t); t.select();
+    try { document.execCommand("copy"); } finally { t.remove(); }
+  }
+  say(`Copiado: ${text}`);
+}
+
 function Card({ u, hide, today, notStarted }: { u: ReturnType<typeof upNext>[number]; hide: boolean; today: string; notStarted?: boolean }) {
   const e = u.episode;
   const extra = [
@@ -52,7 +64,7 @@ function Card({ u, hide, today, notStarted }: { u: ReturnType<typeof upNext>[num
     <div className="card upnext" data-anchor={`u-${u.show.id}`}>
       <Poster src={u.show.imageUrl} large={u.show.imageLarge} title={u.show.name} channel={u.show.channel} width={64} />
       <Link to={`/serie/${u.show.id}`} className="body">
-        <span className="clamp1" style={{ fontWeight: 800, fontSize: 16 }}>{u.show.name}</span>
+        <span className="clamp2" style={{ fontWeight: 800, fontSize: 16 }}>{u.show.name}</span>
         <span className="clamp1">{[episodeCode(e.season, e.number), episodeTitle(e.name, hide)].filter(Boolean).join(" · ")}</span>
         {extra && <span className="small muted">{extra}</span>}
         {notStarted && u.remaining > 1 && (
@@ -61,7 +73,11 @@ function Card({ u, hide, today, notStarted }: { u: ReturnType<typeof upNext>[num
         )}
       </Link>
       <button className="btn tonal" onClick={() => (notStarted ? setWatched(u.show.id, [e.id], true) : markWatched(e))}>
-        <Check size={17} strokeWidth={3} />Visto
+        <Check size={17} strokeWidth={3} /><span className="hide-xs">Visto</span>
+      </button>
+      <button className="btn ghost icon-btn" title="Copiar nome e episódio" aria-label="Copiar nome e episódio"
+        onClick={() => copyText(`${u.show.name} ${episodeCode(e.season, e.number)}`)}>
+        <Copy size={18} />
       </button>
     </div>
   );

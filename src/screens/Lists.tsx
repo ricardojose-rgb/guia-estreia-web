@@ -90,7 +90,7 @@ function groupEpisodes(list: AgendaEpisode[], key: (e: AgendaEpisode) => string)
 /** "T1 E1–E4" ou "T1 E9 – T2 E2". */
 function episodeRange(g: AgendaEpisode[]): string {
   const a = g[0], b = g[g.length - 1];
-  if (a.season === b.season) return `T${a.season} E${a.number ?? "?"}–E${b.number ?? "?"}`;
+  if (a.season === b.season && a.number != null && b.number != null) return `${episodeCode(a.season, a.number)}–E${String(b.number).padStart(2, "0")}`;
   return `${episodeCode(a.season, a.number)} – ${episodeCode(b.season, b.number)}`;
 }
 

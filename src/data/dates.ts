@@ -65,7 +65,7 @@ export function ptAirTime(airstamp: string | null | undefined, airtime: string |
 }
 
 export const episodeCode = (season: number, number: number | null | undefined) =>
-  number == null ? `T${season} Especial` : `T${season} E${number}`;
+  number == null ? `S${pad2(season)} Especial` : `S${pad2(season)}E${pad2(number)}`;
 
 /** Esconde "Episode 5" e afins; com spoilers escondidos, devolve null. */
 export function episodeTitle(name: string | null | undefined, hide: boolean): string | null {
@@ -99,3 +99,6 @@ export function statusPt(s: string | null | undefined): string | null {
     default: return null;
   }
 }
+
+/** 4 → "04". */
+export const pad2 = (n: number) => String(n).padStart(2, "0");
