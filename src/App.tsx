@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { HashRouter, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { CalendarDays, CirclePlay, Clapperboard, Compass, Library, RefreshCw, Settings as Cog, Sparkles } from "lucide-react";
-import { MoviePage, MyMovies } from "./screens/Movies";
+import { MoviePage, MoviesAgenda, MyMovies } from "./screens/Movies";
 import { AnimePage } from "./screens/Anime";
 import { refreshAll, useStore } from "./data/store";
 import { Segmented, Toasts } from "./ui/components";
@@ -37,7 +37,7 @@ function Agenda() {
   return (
     <>
       <Segmented options={KINDS} value={kind} onChange={setKind} />
-      {kind === "series" ? <SeriesAgenda /> : kind === "anime" ? <AnimeAgenda /> : <MoviesList />}
+      {kind === "series" ? <SeriesAgenda /> : kind === "anime" ? <AnimeAgenda /> : <MoviesAgenda />}
     </>
   );
 }

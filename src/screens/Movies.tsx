@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { openResolved, rtSearch, rtUrl } from "../data/links";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Bookmark, BookmarkCheck, Check, ExternalLink } from "lucide-react";
 import type { MovieDetails, MovieEntry, Scores } from "../data/types";
 import { friendlyError, movieDetails, scoresForMovie, tmdbPoster } from "../data/api";
 import { addMovie, removeMovie, setMovieWatched, toMovieEntry, useStore } from "../data/store";
-import { shortDate, usToday } from "../data/dates";
-import { Empty, Poster, ScoreChips, Segmented, Spinner, useAsync } from "../ui/components";
+import { addDays, shortDate, usToday } from "../data/dates";
+import { DayHeader, Empty, Poster, ScoreChips, Segmented, Spinner, useAsync } from "../ui/components";
 
 /** Estado de um filme em relação à casa: já disponível, data prevista, ou só no cinema. */
 export function homeStatus(d: MovieDetails | undefined, today: string, year: number): { text: string; ready: boolean } {
@@ -206,6 +206,96 @@ export function MoviePage() {
         <a className="btn ghost" href={`https://www.themoviedb.org/movie/${m.id}`} target="_blank" rel="noopener">TMDB <ExternalLink size={14} /></a>
       </div>
       <p className="small muted" style={{ marginTop: 18 }}>Dados de filmes: TMDB. Onde ver: JustWatch, através do TMDB.</p>
+    </>
+  );
+}
+
+/** Agenda dos filmes da tua lista "Por ver": quando chegam ao cinema, ao digital e ao Blu-ray (datas dos EUA). */
+export function MoviesAgenda() {
+  const movies = useStore((s) => s.movies);
+  const watched = useStore((s) => s.moviesWatched);
+  const token = useStore((s) => s.prefs.tmdbToken);
+  const todo = Object.values(movies).filter((m) => !watched[m.id]);
+  const ids = todo.map((m) => m.id).join(",");
+  const details = useAsync(async () => {
+    if (!token || !todo.length) return {} as Record<number, MovieDetails>;
+    const out: Record<number, MovieDetails> = {};
+    for (let i = 0; i < todo.length; i += 8) {
+      const batch = await Promise.all(todo.slice(i, i + 8).map((m) => movieDetails(token, m.id).catch(() => null)));
+      batch.forEach((d) => { if (d) out[d.id] = d; });
+    }
+    return out;
+  }, [token, ids]);
+  const today = usToday();
+  const year = Number(today.slice(0, 4));
+  const from = addDays(today, -30);
+
+  type Ev = { date: string; kind: "Digital" | "Blu-ray" | "Cinema"; m: MovieEntry; d: MovieDetails };
+  const events: Ev[] = [];
+  const undated: MovieEntry[] = [];
+  for (const m of todo) {
+    const d = details.data?.[m.id];
+    if (!d) continue;
+    const evs: Ev[] = [];
+    if (d.theatricalDate) evs.push({ date: d.theatricalDate, kind: "Cinema", m, d });
+    if (d.digitalDate) evs.push({ date: d.digitalDate, kind: "Digital", m, d });
+    if (d.physicalDate) evs.push({ date: d.physicalDate, kind: "Blu-ray", m, d });
+    const shown = evs.filter((e) => e.date >= from);
+    if (shown.length) events.push(...shown); else if (!d.homeDate || d.homeDate > today) undated.push(m);
+  }
+  events.sort((a, b) => a.date.localeCompare(b.date));
+  const recent = events.filter((e) => e.date < today).reverse();
+  const coming = events.filter((e) => e.date >= today);
+  const groups = new Map<string, Ev[]>();
+  for (const e of coming) (groups.get(e.date) ?? groups.set(e.date, []).get(e.date)!).push(e);
+
+  const card = (e: Ev, showDate = false) => (
+    <div className="row" key={`${e.kind}-${e.m.id}`} data-anchor={`ma-${e.m.id}-${e.kind}`}>
+      <Link className="body" to={`/filme/${e.m.id}`}>
+        <Poster src={tmdbPoster(e.m.poster)} large={tmdbPoster(e.m.poster, "original")} title={e.m.title} width="100%" zoomable={false} />
+        <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <span className={`tag ${e.kind === "Cinema" ? "ret" : e.kind === "Digital" ? "film" : "new"}`}>{e.kind}</span>
+          {showDate && <span className="small muted">{shortDate(e.date, year)}</span>}
+        </span>
+        <span className="title clamp2">{e.m.title}</span>
+        {e.d.providersPT.length > 0 && <span className="small" style={{ color: "var(--new)" }}>Em {e.d.providersPT[0].name}</span>}
+      </Link>
+      <MovieButtons entry={e.m} compact />
+    </div>
+  );
+
+  if (!token) return <Empty title="Falta a chave do TMDB" body="A agenda dos filmes usa o TMDB. Junta a chave nas Definições." action={<Link className="btn filled" to="/definicoes">Abrir Definições</Link>} />;
+  return (
+    <>
+      <p className="eyebrow" style={{ marginTop: 14 }}>Os filmes da tua lista · datas dos EUA</p>
+      {!todo.length && <Empty title="A tua lista de filmes está vazia" body="Carrega no marcador de um filme em Descobrir → Filmes. As datas de cinema, digital e Blu-ray aparecem aqui." action={<Link className="btn filled" to="/descobrir">Descobrir</Link>} />}
+      {todo.length > 0 && details.loading && <Spinner />}
+      {[...groups].map(([date, items]) => (
+        <Fragment key={date}>
+          <DayHeader date={date} today={today} />
+          <div className="rows cards">{items.map((e) => card(e))}</div>
+        </Fragment>
+      ))}
+      {recent.length > 0 && (
+        <>
+          <h2 className="h2">Chegaram há pouco · últimos 30 dias</h2>
+          <div className="rows cards">{recent.map((e) => card(e, true))}</div>
+        </>
+      )}
+      {undated.length > 0 && (
+        <>
+          <h2 className="h2">Ainda sem data</h2>
+          <div className="poster-grid">{undated.map((m) => (
+            <Link key={m.id} to={`/filme/${m.id}`} className="tile">
+              <Poster src={tmdbPoster(m.poster)} title={m.title} width="100%" zoomable={false} />
+              <span className="clamp2" style={{ fontWeight: 800 }}>{m.title}</span>
+            </Link>
+          ))}</div>
+        </>
+      )}
+      {todo.length > 0 && !details.loading && !events.length && !undated.length && (
+        <Empty title="Nada marcado" body="Os filmes da tua lista já estão todos disponíveis em casa. Vê-os em Filmes → Por ver." />
+      )}
     </>
   );
 }

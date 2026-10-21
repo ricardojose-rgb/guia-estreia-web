@@ -1,4 +1,5 @@
 import { get as idbGet, set as idbSet } from "idb-keyval";
+import { jikanDetails, jikanSearch, jikanSeason, jikanUpcoming } from "./jikan";
 import type { AniDetails, AniMedia, AnimeEpisode, Anticipated, HomeMovie, MovieDetails, Premiere, ScoreItem, Scores, TmdbMovie, TmEpisode, TmShow } from "./types";
 import { addDays, seasonOf, usToday } from "./dates";
 
@@ -115,8 +116,17 @@ async function ani<T>(query: string, variables: Record<string, unknown> = {}): P
 
 export const aniTitle = (m: AniMedia) => m.title.english || m.title.romaji || "";
 
+/** Tenta o AniList; se falhar (ex.: está em baixo), usa o MyAnimeList através do Jikan. */
+async function aniOr<T>(primary: () => Promise<T>, fallback: () => Promise<T>): Promise<T> {
+  try { return await primary(); } catch { return fallback(); }
+}
+
 /** Animes da temporada atual e os que continuam no ar da anterior. */
 export function animeSeason(): Promise<AniMedia[]> {
+  return aniOr(() => aniSeason(), () => cached("anime:season:mal", 3 * 3600_000, jikanSeason));
+}
+
+function aniSeason(): Promise<AniMedia[]> {
   return cached("anime:season", 6 * 3600_000, async () => {
     const now = new Date();
     const cur = seasonOf(now);
@@ -160,6 +170,10 @@ export function animeSchedule(): Promise<AnimeEpisode[]> {
 
 /** Animes que ainda não estrearam, por popularidade. */
 export function animeUpcoming(): Promise<AniMedia[]> {
+  return aniOr(() => aniUpcoming(), () => cached("anime:upcoming:mal", 6 * 3600_000, jikanUpcoming));
+}
+
+function aniUpcoming(): Promise<AniMedia[]> {
   return cached("anime:upcoming", 12 * 3600_000, async () => {
     const q = `query { Page(page: 1, perPage: 25) {
       media(status: NOT_YET_RELEASED, type: ANIME, sort: POPULARITY_DESC, isAdult: false) { ${ANI_FIELDS} startDate { year month day } } } }`;
@@ -169,7 +183,11 @@ export function animeUpcoming(): Promise<AniMedia[]> {
 }
 
 /** Procura animes pelo nome (AniList). */
-export async function searchAnime(q: string): Promise<AniMedia[]> {
+export function searchAnime(q: string): Promise<AniMedia[]> {
+  return aniOr(() => aniSearch(q), () => jikanSearch(q));
+}
+
+async function aniSearch(q: string): Promise<AniMedia[]> {
   const query = `query ($q: String) { Page(page: 1, perPage: 20) {
     media(search: $q, type: ANIME, isAdult: false, sort: SEARCH_MATCH) { ${ANI_FIELDS} startDate { year month day } nextAiringEpisode { episode airingAt } } } }`;
   const r = await ani<{ Page: { media: AniMedia[] } }>(query, { q });
@@ -178,6 +196,8 @@ export async function searchAnime(q: string): Promise<AniMedia[]> {
 
 /** Tudo o que a página do anime mostra; cache de 12 horas. */
 export function animeDetails(id: number): Promise<AniDetails> {
+  // id negativo = anime do MyAnimeList (veio do Jikan)
+  if (id < 0) return cached(`anime:mal:${-id}`, 12 * 3600_000, () => jikanDetails(-id));
   return cached(`anime:${id}`, 12 * 3600_000, async () => {
     const query = `query ($id: Int) { Media(id: $id, type: ANIME) { ${ANI_FIELDS} idMal bannerImage description(asHtml: false) season seasonYear duration
       startDate { year month day } nextAiringEpisode { episode airingAt } studios(isMain: true) { nodes { name } } externalLinks { site url type } } }`;

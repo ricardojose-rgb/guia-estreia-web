@@ -10,72 +10,62 @@ import { followAnime, followById, setWatched, markWatched, toMovieEntry, useStor
 import { agendaEpisodes, type AgendaEpisode } from "../data/selectors";
 import { addDays, episodeCode, episodeTitle, MONTHS_SHORT, ptAirTime, ptDayTime, ptToday, SEASON_PT, seasonOf, shortDate, usToday } from "../data/dates";
 import { useSessionState } from "../ui/memory";
+import { isAnime } from "./MyShows";
 import { AniScore, Carousel, Chips, DayHeader, Empty, FollowButton, Poster, ScoreChips, Spinner, Tag, useAsync } from "../ui/components";
 import { Check } from "lucide-react";
 
 // ---------------- Séries ----------------
 
-type SeriesFilter = "all" | "mine" | "new" | "ret";
-
-export function SeriesAgenda() {
-  const shows = useStore((s) => s.shows);
+/**
+ * Agenda das séries (ou dos animes) que segues: só episódios teus, nada de séries que não vês.
+ * Séries em datas dos EUA; animes agrupados pelo dia em Portugal.
+ */
+export function SeriesAgenda({ kind = "series" }: { kind?: "series" | "anime" }) {
+  const anime = kind === "anime";
+  const allShows = useStore((s) => s.shows);
+  const links = useStore((s) => s.animeLinks);
   const episodes = useStore((s) => s.episodes);
   const watched = useStore((s) => s.watched);
-  const pending = useStore((s) => s.pending);
   const hide = useStore((s) => s.prefs.hideSpoilers);
-  const [filter, setFilter] = useState<SeriesFilter>("all");
   const today = usToday();
-  const prem = useAsync(() => premieres(), []);
+  const ptNow = ptToday();
+  const shows = useMemo(() => Object.fromEntries(Object.entries(allShows).filter(([, sh]) => isAnime(sh, links) === anime)), [allShows, links, anime]);
 
   const eps = useMemo(() => agendaEpisodes(shows, episodes, watched, addDays(today, -7), addDays(today, 60)), [shows, episodes, watched, today]);
-  const behind = eps.filter((e) => e.airdate! < today && !e.watched);
-  const upcoming = eps.filter((e) => e.airdate! >= today);
+  // Dia do episódio: nos animes, o dia em Portugal (a hora de estreia no Japão convertida)
+  const dayOf = (e: AgendaEpisode) => (anime && e.airstamp ? ptDayTime(new Date(e.airstamp)).day : e.airdate!);
+  const ref = anime ? ptNow : today;
+  const behind = eps.filter((e) => dayOf(e) < ref && !e.watched);
+  const upcoming = eps.filter((e) => dayOf(e) >= ref);
+  // Vários episódios da mesma série no mesmo dia ficam num só cartão
+  const groups = groupBy(groupEpisodes(upcoming, (e) => `${e.showId}-${dayOf(e)}`).sort((a, b) => dayOf(a[0]).localeCompare(dayOf(b[0]))), (g) => dayOf(g[0]));
+  const word = anime ? "animes" : "séries";
 
-  type Row = { date: string; ep?: AgendaEpisode[]; p?: Premiere };
-  const rows = useMemo<Row[]>(() => {
-    const mineKeys = new Set(upcoming.map((e) => `${e.showId}-${e.airdate}`));
-    const p = (prem.data ?? []).filter((x) => !mineKeys.has(`${x.showId}-${x.date}`));
-    // Vários episódios da mesma série no mesmo dia ficam num só cartão
-    const mine: Row[] = groupEpisodes(upcoming, (e) => `${e.showId}-${e.airdate}`).map((g) => ({ date: g[0].airdate!, ep: g }));
-    const pr: Row[] = p.map((x) => ({ date: x.date, p: x }));
-    const chosen = filter === "all" ? [...mine, ...pr]
-      : filter === "mine" ? [...mine, ...pr.filter((r) => shows[r.p!.showId])]
-      : filter === "new" ? pr.filter((r) => r.p!.isNew) : pr.filter((r) => !r.p!.isNew);
-    return chosen.sort((a, b) => a.date.localeCompare(b.date) || (a.ep ? 0 : 1) - (b.ep ? 0 : 1));
-  }, [upcoming, prem.data, filter, shows]);
-
-  const groups = groupBy(rows, (r) => r.date);
   return (
     <>
-      <p className="eyebrow" style={{ marginTop: 14 }}>Datas dos EUA</p>
-      <Chips value={filter} onChange={setFilter} options={[
-        { value: "all", label: "Tudo" }, { value: "mine", label: "As minhas" }, { value: "new", label: "Séries novas" }, { value: "ret", label: "Regressos" },
-      ]} />
-      {prem.loading && filter !== "mine" && <div className="small muted" style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12 }}><span className="spinner" />A carregar as estreias das próximas 3 semanas…</div>}
-      {prem.error != null && <p className="small muted">{friendlyError(prem.error)} <button className="btn ghost" onClick={prem.reload}>Tentar outra vez</button></p>}
-
-      {behind.length > 0 && (filter === "all" || filter === "mine") && (
+      <p className="eyebrow" style={{ marginTop: 14 }}>{anime ? "Os animes que segues · hora de Portugal" : `As ${word} que segues · datas dos EUA`}</p>
+      {!Object.keys(shows).length && (
+        <Empty title={`Ainda não segues ${word}`} body={`Procura em Descobrir e carrega em ＋. Os próximos episódios aparecem aqui.`}
+          action={<Link className="btn filled" to="/descobrir">Descobrir</Link>} />
+      )}
+      {behind.length > 0 && (
         <>
           <h2 className="h2">Por ver · últimos 7 dias</h2>
           <div className="rows cards">{groupEpisodes(behind, (e) => `${e.showId}`).map((g) => <EpisodeRow key={`b${g[0].id}`} eps={g} hide={hide} today={today} />)}</div>
         </>
       )}
-      {!rows.length && !prem.loading && (
-        filter === "mine" && !Object.keys(shows).length
-          ? <Empty title="Ainda não segues séries" body="Procura as séries que vês e carrega em ＋. Os próximos episódios aparecem aqui." action={<Link className="btn filled" to="/descobrir">Procurar séries</Link>} />
-          : <Empty title="Nada marcado" body="Não há estreias neste filtro para as próximas semanas." />
+      {Object.keys(shows).length > 0 && !upcoming.length && !behind.length && (
+        <Empty title="Nada marcado" body={`Não há episódios novos das tuas ${word} nos próximos dois meses.`} />
       )}
       {groups.map(([date, items]) => (
         <Fragment key={date}>
-          <DayHeader date={date} today={today} />
-          <div className="rows cards">
-            {items.map((r) => r.ep
-              ? <EpisodeRow key={`e${r.ep[0].id}`} eps={r.ep} hide={hide} today={today} />
-              : <PremiereRow key={`p${r.p!.showId}-${r.p!.season}`} p={r.p!} followed={!!shows[r.p!.showId]} loading={!!pending[`t${r.p!.showId}`]} />)}
-          </div>
+          <DayHeader date={date} today={ref} />
+          <div className="rows cards">{items.map((g) => <EpisodeRow key={`e${g[0].id}`} eps={g} hide={hide} today={today} />)}</div>
         </Fragment>
       ))}
-      <p className="small muted" style={{ marginTop: 28 }}>Os episódios que estreiam à noite nos EUA ficam normalmente disponíveis no dia seguinte em Portugal. Dados: TVmaze.</p>
+      <p className="small muted" style={{ marginTop: 28 }}>{anime
+        ? "As horas são as da estreia no Japão convertidas para Portugal; as plataformas de streaming podem disponibilizar o episódio um pouco mais tarde. Dados: TVmaze."
+        : "Os episódios que estreiam à noite nos EUA ficam normalmente disponíveis no dia seguinte em Portugal. Dados: TVmaze."}</p>
     </>
   );
 }
@@ -138,29 +128,9 @@ export function PremiereRow({ p, followed, loading }: { p: Premiere; followed: b
 
 // ---------------- Anime ----------------
 
-/** Episódios de anime dos próximos 14 dias, em hora de Portugal. */
+/** Agenda dos animes que segues (episódios do TVmaze, em hora de Portugal). */
 export function AnimeAgenda() {
-  const [filter, setFilter] = useState<"pop" | "all">("pop");
-  const sched = useAsync(() => animeSchedule(), []);
-  const today = ptToday();
-  const now = Date.now() / 1000 - 3 * 3600;
-  const list = (sched.data ?? []).filter((e) => e.airingAt >= now && (filter === "all" || (e.media.popularity ?? 0) >= 15000));
-  const groups = groupBy(list, (e) => ptDayTime(new Date(e.airingAt * 1000)).day);
-  return (
-    <>
-      <p className="eyebrow" style={{ marginTop: 14 }}>Hora de Portugal · próximos 14 dias</p>
-      <Chips value={filter} onChange={setFilter} options={[{ value: "pop", label: "Populares" }, { value: "all", label: "Todos" }]} />
-      {sched.loading && <Spinner />}
-      {sched.error != null && <Empty title="Não foi possível carregar" body={friendlyError(sched.error)} action={<button className="btn tonal" onClick={sched.reload}>Tentar outra vez</button>} />}
-      {groups.map(([day, items]) => (
-        <Fragment key={day}>
-          <DayHeader date={day} today={today} />
-          <div className="rows cards">{items.map((e) => <AnimeEpisodeRow key={`${e.media.id}-${e.episode}`} e={e} />)}</div>
-        </Fragment>
-      ))}
-      {sched.data && <p className="small muted" style={{ marginTop: 28 }}>Dados: AniList. As horas são as da estreia no Japão convertidas para Portugal. As plataformas de streaming podem disponibilizar o episódio mais tarde.</p>}
-    </>
-  );
+  return <SeriesAgenda kind="anime" />;
 }
 
 function AnimeEpisodeRow({ e }: { e: AnimeEpisode }) {
@@ -212,7 +182,7 @@ export function AnimeDiscover() {
         <Link className="body" to={`/anime/${m.id}`}>
           <Poster src={m.coverImage?.large ?? m.coverImage?.medium} large={m.coverImage?.extraLarge} title={aniTitle(m)} width="100%" zoomable={false} />
           <span className="title clamp2">{aniTitle(m)}</span>
-          {n && t && <span className="small primary-text">Ep {n.episode}{m.episodes ? ` de ${m.episodes}` : ""} · {t.label}</span>}
+          {n && t && <span className="small primary-text">{n.episode > 0 ? `Ep ${n.episode}${m.episodes ? ` de ${m.episodes}` : ""}` : "Próximo ep."} · {t.label}</span>}
           {!n && m.status === "NOT_YET_RELEASED" && <span className="small primary-text">Estreia {dateLabel(m) ?? "por anunciar"}</span>}
           {!n && m.status === "FINISHED" && <span className="small muted">Terminado{m.startDate?.year ? ` · ${m.startDate.year}` : ""}</span>}
           <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -242,7 +212,7 @@ export function AnimeDiscover() {
         </>
       )}
       {q.trim().length < 2 && <>
-      <p className="eyebrow" style={{ marginTop: 14 }}>Temporada de {SEASON_PT[sn]} {year} · horas de Portugal · dados AniList</p>
+      <p className="eyebrow" style={{ marginTop: 14 }}>Temporada de {SEASON_PT[sn]} {year} · horas de Portugal · dados {(season.data?.[0]?.id ?? 1) < 0 ? "MyAnimeList" : "AniList"}</p>
       <Carousel title="Mais aguardados" items={(upcoming.data ?? []).map((m, i) => ({
         key: `u${m.id}`, title: aniTitle(m), image: m.coverImage?.extraLarge ?? m.coverImage?.large, large: m.coverImage?.extraLarge,
         line1: dateLabel(m) ?? "Data por anunciar", line2: m.format === "MOVIE" ? "Filme" : m.format === "ONA" ? "Streaming" : "Série",

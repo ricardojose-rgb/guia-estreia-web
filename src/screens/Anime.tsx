@@ -72,7 +72,7 @@ export function AnimePage() {
               {m.averageScore != null && <AniScore score={m.averageScore} />}
               <span className="small muted">{[m.status ? STATUS_PT[m.status] : null, (m.genres ?? []).slice(0, 3).join(", ")].filter(Boolean).join(" · ")}</span>
             </span>
-            {next && nextT && <span style={{ fontWeight: 800, color: "var(--primary)" }}>Episódio {next.episode} · {nextT.label} (hora de Portugal)</span>}
+            {next && nextT && <span style={{ fontWeight: 800, color: "var(--primary)" }}>{next.episode > 0 ? `Episódio ${next.episode}` : "Próximo episódio"} · {nextT.label} (hora de Portugal)</span>}
             {!next && m.status === "NOT_YET_RELEASED" && <span style={{ fontWeight: 800, color: "var(--primary)" }}>Estreia: {aniDate(m) ?? "data por anunciar"}</span>}
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
               {followed
@@ -99,10 +99,10 @@ export function AnimePage() {
       )}
 
       <div style={{ display: "flex", gap: 4, flexWrap: "wrap", margin: "18px -12px 0" }}>
-        {m.siteUrl && <a className="btn ghost" href={m.siteUrl} target="_blank" rel="noopener">AniList <ExternalLink size={14} /></a>}
+        {m.siteUrl && m.id > 0 && <a className="btn ghost" href={m.siteUrl} target="_blank" rel="noopener">AniList <ExternalLink size={14} /></a>}
         {m.idMal && <a className="btn ghost" href={`https://myanimelist.net/anime/${m.idMal}`} target="_blank" rel="noopener">MyAnimeList <ExternalLink size={14} /></a>}
       </div>
-      <p className="small muted" style={{ marginTop: 18 }}>Dados de anime: AniList. Os episódios vêm do TVmaze quando segues o anime.</p>
+      <p className="small muted" style={{ marginTop: 18 }}>Dados de anime: {m.id > 0 ? "AniList" : "MyAnimeList (o AniList não está a responder)"}. Os episódios vêm do TVmaze quando segues o anime.</p>
     </>
   );
 }
