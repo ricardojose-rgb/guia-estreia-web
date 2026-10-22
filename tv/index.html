@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1920, user-scalable=no">
+  <title>Guia de Estreias</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><img src="icon.png" alt=""><span>Guia de Estreias</span></div>
+    <nav class="tabs" id="tabs">
+      <button class="tab focusable" data-tab="upnext">Para ver</button>
+      <button class="tab focusable" data-tab="agenda">Agenda</button>
+      <button class="tab focusable" data-tab="movies">Filmes</button>
+      <button class="tab focusable" data-tab="settings">Definições</button>
+    </nav>
+    <div class="clock" id="clock"></div>
+  </header>
+  <main id="main"></main>
+  <div class="overlay" id="overlay" hidden></div>
+  <div class="status" id="status" hidden></div>
+  <footer class="hints">
+    <span><i class="dot red"></i>Atualizar</span>
+    <span><i class="dot back"></i>Voltar</span>
+  </footer>
+  <script src="app.js"></script>
+</body>
+</html>

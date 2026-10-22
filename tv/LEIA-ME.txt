@@ -1,0 +1,30 @@
+GUIA DE ESTREIAS PARA A TV (Samsung Tizen, testado para a UE50AU9075 de 2021)
+=============================================================================
+
+O que tem
+- Para ver: o próximo episódio de cada série que segues.
+- Agenda: os episódios das tuas séries nas próximas duas semanas, com a data dos EUA
+  e a hora em Portugal.
+- Filmes: a tua lista, com as datas de chegada a casa e onde ver em Portugal.
+- Atualiza sozinha a cada 30 minutos; botão VERMELHO do comando para atualizar já.
+- É só de leitura: os vistos continuam a marcar-se no telemóvel ou no site.
+
+Instalar (uma vez, no PC com Windows)
+1. Na TV: abre Apps, carrega 1 2 3 4 5 no comando (ou no teclado no ecrã),
+   ativa o Modo de Programador e escreve o IP do teu PC. Reinicia a TV
+   (mantém o botão de energia premido até aparecer o logótipo).
+2. No PC: descarrega o "Samsung Jellyfin Installer" em
+   https://github.com/Jellyfin2Samsung/Samsung-Jellyfin-Installer/releases
+   (é gratuito e trata da assinatura do pacote com a tua conta Samsung).
+3. No instalador escolhe a TV, depois a opção de pacote próprio (.wgt) e escolhe
+   GuiaEstreias.wgt. Na primeira vez pede para iniciares sessão na conta Samsung.
+4. A app aparece em Apps na TV. Podes movê-la para a barra inicial.
+   De caminho, o mesmo instalador instala o Jellyfin e o TizenTube, se quiseres.
+
+Primeira vez na app
+- Vai a Definições e escreve o código de sincronização. Encontras-o no site
+  (Definições → Sincronização → "Código para a app da TV").
+- Para não escrever 32 letras com o comando: abre o campo na TV e usa o teclado da
+  app SmartThings no telemóvel, ou no PC: .\TV.ps1 texto "o-código"
+
+Atualizar a app: corre outra vez o instalador com o .wgt novo (os dados ficam).

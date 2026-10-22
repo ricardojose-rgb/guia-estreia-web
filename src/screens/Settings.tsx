@@ -41,6 +41,11 @@ function SyncCard() {
             <button className="btn tonal" disabled={sync.status === "syncing"} onClick={() => syncNow()}><RefreshCw size={16} />Sincronizar agora</button>
             <button className="btn ghost" onClick={disconnectSync}>Desligar</button>
           </div>
+          {sync.gistId && (
+            <p className="small muted" style={{ margin: 0 }}>
+              Código para a app da TV: <b style={{ color: "var(--fg)", fontFamily: "ui-monospace, monospace", userSelect: "all", wordBreak: "break-all" }}>{sync.gistId}</b>
+            </p>
+          )}
         </>
       ) : (
         <>
