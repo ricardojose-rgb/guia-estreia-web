@@ -8,7 +8,7 @@ import {
 } from "../data/api";
 import { followAnime, followById, setWatched, markWatched, toMovieEntry, useStore } from "../data/store";
 import { agendaEpisodes, type AgendaEpisode } from "../data/selectors";
-import { addDays, episodeCode, episodeTitle, MONTHS_SHORT, ptAirTime, ptDayTime, ptToday, SEASON_PT, seasonOf, shortDate, usToday } from "../data/dates";
+import { addDays, jpDayTime, jpToday, episodeCode, episodeTitle, MONTHS_SHORT, ptAirTime, ptDayTime, ptToday, SEASON_PT, seasonOf, shortDate, usToday } from "../data/dates";
 import { useSessionState } from "../ui/memory";
 import { isAnime } from "./MyShows";
 import { AniScore, Carousel, Chips, DayHeader, Empty, FollowButton, Poster, ScoreChips, Spinner, Tag, useAsync } from "../ui/components";
@@ -32,9 +32,9 @@ export function SeriesAgenda({ kind = "series" }: { kind?: "series" | "anime" })
   const shows = useMemo(() => Object.fromEntries(Object.entries(allShows).filter(([, sh]) => isAnime(sh, links) === anime)), [allShows, links, anime]);
 
   const eps = useMemo(() => agendaEpisodes(shows, episodes, watched, addDays(today, -7), addDays(today, 60)), [shows, episodes, watched, today]);
-  // Dia do episódio: nos animes, o dia em Portugal (a hora de estreia no Japão convertida)
-  const dayOf = (e: AgendaEpisode) => (anime && e.airstamp ? ptDayTime(new Date(e.airstamp)).day : e.airdate!);
-  const ref = anime ? ptNow : today;
+  // Datas sempre as de origem (EUA nas séries, Japão nos animes); a hora em Portugal aparece no cartão
+  const dayOf = (e: AgendaEpisode) => e.airdate!;
+  const ref = anime ? jpToday() : today;
   const behind = eps.filter((e) => dayOf(e) < ref && !e.watched);
   const upcoming = eps.filter((e) => dayOf(e) >= ref);
   // Vários episódios da mesma série no mesmo dia ficam num só cartão
@@ -43,7 +43,7 @@ export function SeriesAgenda({ kind = "series" }: { kind?: "series" | "anime" })
 
   return (
     <>
-      <p className="eyebrow" style={{ marginTop: 14 }}>{anime ? "Os animes que segues · hora de Portugal" : `As ${word} que segues · datas dos EUA`}</p>
+      <p className="eyebrow" style={{ marginTop: 14 }}>{anime ? "Os animes que segues · datas do Japão" : `As ${word} que segues · datas dos EUA`}</p>
       {!Object.keys(shows).length && (
         <Empty title={`Ainda não segues ${word}`} body={`Procura em Descobrir e carrega em ＋. Os próximos episódios aparecem aqui.`}
           action={<Link className="btn filled" to="/descobrir">Descobrir</Link>} />
@@ -51,7 +51,7 @@ export function SeriesAgenda({ kind = "series" }: { kind?: "series" | "anime" })
       {behind.length > 0 && (
         <>
           <h2 className="h2">Por ver · últimos 7 dias</h2>
-          <div className="rows cards">{groupEpisodes(behind, (e) => `${e.showId}`).map((g) => <EpisodeRow key={`b${g[0].id}`} eps={g} hide={hide} today={today} />)}</div>
+          <div className="rows cards">{groupEpisodes(behind, (e) => `${e.showId}`).map((g) => <EpisodeRow key={`b${g[0].id}`} eps={g} hide={hide} today={ref} />)}</div>
         </>
       )}
       {Object.keys(shows).length > 0 && !upcoming.length && !behind.length && (
@@ -60,11 +60,11 @@ export function SeriesAgenda({ kind = "series" }: { kind?: "series" | "anime" })
       {groups.map(([date, items]) => (
         <Fragment key={date}>
           <DayHeader date={date} today={ref} />
-          <div className="rows cards">{items.map((g) => <EpisodeRow key={`e${g[0].id}`} eps={g} hide={hide} today={today} />)}</div>
+          <div className="rows cards">{items.map((g) => <EpisodeRow key={`e${g[0].id}`} eps={g} hide={hide} today={ref} />)}</div>
         </Fragment>
       ))}
       <p className="small muted" style={{ marginTop: 28 }}>{anime
-        ? "As horas são as da estreia no Japão convertidas para Portugal; as plataformas de streaming podem disponibilizar o episódio um pouco mais tarde. Dados: TVmaze."
+        ? "As datas são as da estreia no Japão; a hora em Portugal aparece em cada episódio. As plataformas de streaming podem disponibilizar o episódio um pouco mais tarde. Dados: TVmaze."
         : "Os episódios que estreiam à noite nos EUA ficam normalmente disponíveis no dia seguinte em Portugal. Dados: TVmaze."}</p>
     </>
   );
@@ -164,7 +164,7 @@ export function AnimeDiscover() {
   const links = useStore((s) => s.animeLinks);
   const shows = useStore((s) => s.shows);
   const pending = useStore((s) => s.pending);
-  const today = ptToday();
+  const today = jpToday();
   const { season: sn, year } = seasonOf(new Date());
 
   const all = season.data ?? [];
@@ -176,13 +176,15 @@ export function AnimeDiscover() {
   const row = (m: AniMedia) => {
     const followed = !!(links[m.id] && shows[links[m.id]]);
     const n = m.nextAiringEpisode;
-    const t = n ? ptDayTime(new Date(n.airingAt * 1000)) : null;
+    const t = n ? jpDayTime(new Date(n.airingAt * 1000)) : null;
+    const pt = n ? ptDayTime(new Date(n.airingAt * 1000)) : null;
     return (
       <div className="row" key={m.id} data-anchor={`a-${m.id}`}>
         <Link className="body" to={`/anime/${m.id}`}>
           <Poster src={m.coverImage?.large ?? m.coverImage?.medium} large={m.coverImage?.extraLarge} title={aniTitle(m)} width="100%" zoomable={false} />
           <span className="title clamp2">{aniTitle(m)}</span>
-          {n && t && <span className="small primary-text">{n.episode > 0 ? `Ep ${n.episode}${m.episodes ? ` de ${m.episodes}` : ""}` : "Próximo ep."} · {t.label}</span>}
+          {n && t && <span className="small primary-text">{n.episode > 0 ? `Ep ${n.episode}${m.episodes ? ` de ${m.episodes}` : ""}` : "Próximo ep."} · {t.label} Japão</span>}
+          {pt && <span className="small muted">Em Portugal: {pt.label}</span>}
           {!n && m.status === "NOT_YET_RELEASED" && <span className="small primary-text">Estreia {dateLabel(m) ?? "por anunciar"}</span>}
           {!n && m.status === "FINISHED" && <span className="small muted">Terminado{m.startDate?.year ? ` · ${m.startDate.year}` : ""}</span>}
           <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -195,7 +197,7 @@ export function AnimeDiscover() {
     );
   };
 
-  const groups = sort === "airing" ? groupBy(list, (m) => ptDayTime(new Date(m.nextAiringEpisode!.airingAt * 1000)).day) : null;
+  const groups = sort === "airing" ? groupBy(list, (m) => jpDayTime(new Date(m.nextAiringEpisode!.airingAt * 1000)).day) : null;
   return (
     <>
       <div className="search" style={{ marginTop: 14 }}>
@@ -212,7 +214,7 @@ export function AnimeDiscover() {
         </>
       )}
       {q.trim().length < 2 && <>
-      <p className="eyebrow" style={{ marginTop: 14 }}>Temporada de {SEASON_PT[sn]} {year} · horas de Portugal · dados {(season.data?.[0]?.id ?? 1) < 0 ? "MyAnimeList" : "AniList"}</p>
+      <p className="eyebrow" style={{ marginTop: 14 }}>Temporada de {SEASON_PT[sn]} {year} · datas do Japão · dados {(season.data?.[0]?.id ?? 1) < 0 ? "MyAnimeList" : "AniList"}</p>
       <Carousel title="Mais aguardados" items={(upcoming.data ?? []).map((m, i) => ({
         key: `u${m.id}`, title: aniTitle(m), image: m.coverImage?.extraLarge ?? m.coverImage?.large, large: m.coverImage?.extraLarge,
         line1: dateLabel(m) ?? "Data por anunciar", line2: m.format === "MOVIE" ? "Filme" : m.format === "ONA" ? "Streaming" : "Série",

@@ -49,6 +49,16 @@ export function weekdayShort(iso: string): string {
   return WEEKDAYS_SHORT[parts(iso).wd];
 }
 
+export const TOKYO = "Asia/Tokyo";
+export const jpToday = () => isoDay(new Date(), TOKYO);
+
+/** Dia e hora no Japão (data de origem dos animes) a partir de um instante. */
+export function jpDayTime(date: Date): { day: string; time: string; label: string } {
+  const day = isoDay(date, TOKYO);
+  const time = new Intl.DateTimeFormat("pt-PT", { timeZone: TOKYO, hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
+  return { day, time, label: `${weekdayShort(day)} ${time}` };
+}
+
 /** Dia e hora em Portugal a partir de um instante ("sex 02:00"). */
 export function ptDayTime(date: Date): { day: string; time: string; label: string } {
   const day = isoDay(date, LISBON);

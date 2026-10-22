@@ -4,7 +4,7 @@ import { ArrowLeft, Check, ExternalLink } from "lucide-react";
 import { useEffect } from "react";
 import { aniTitle, animeDetails, animeTvmazeId, friendlyError } from "../data/api";
 import { followAnime, unfollow, useStore } from "../data/store";
-import { MONTHS_SHORT, ptDayTime, SEASON_PT } from "../data/dates";
+import { jpDayTime, MONTHS_SHORT, ptDayTime, SEASON_PT, shortDate } from "../data/dates";
 import { AniScore, Empty, Poster, Spinner, useAsync } from "../ui/components";
 import type { AniMedia } from "../data/types";
 
@@ -44,7 +44,8 @@ export function AnimePage() {
   const m = d.data;
   const title = aniTitle(m);
   const next = m.nextAiringEpisode;
-  const nextT = next ? ptDayTime(new Date(next.airingAt * 1000)) : null;
+  const nextT = next ? jpDayTime(new Date(next.airingAt * 1000)) : null;
+  const nextPt = next ? ptDayTime(new Date(next.airingAt * 1000)) : null;
   const studio = m.studios?.nodes?.[0]?.name;
   const desc = cleanDescription(m.description);
   const streaming = (m.externalLinks ?? []).filter((l) => l.type === "STREAMING");
@@ -72,7 +73,7 @@ export function AnimePage() {
               {m.averageScore != null && <AniScore score={m.averageScore} />}
               <span className="small muted">{[m.status ? STATUS_PT[m.status] : null, (m.genres ?? []).slice(0, 3).join(", ")].filter(Boolean).join(" · ")}</span>
             </span>
-            {next && nextT && <span style={{ fontWeight: 800, color: "var(--primary)" }}>{next.episode > 0 ? `Episódio ${next.episode}` : "Próximo episódio"} · {nextT.label} (hora de Portugal)</span>}
+            {next && nextT && <span style={{ fontWeight: 800, color: "var(--primary)" }}>{next.episode > 0 ? `Episódio ${next.episode}` : "Próximo episódio"} · {shortDate(nextT.day)} ({nextT.label} no Japão · {nextPt!.label} em Portugal)</span>}
             {!next && m.status === "NOT_YET_RELEASED" && <span style={{ fontWeight: 800, color: "var(--primary)" }}>Estreia: {aniDate(m) ?? "data por anunciar"}</span>}
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
               {followed
