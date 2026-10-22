@@ -1,5 +1,6 @@
 import { get as idbGet, set as idbSet } from "idb-keyval";
 import { jikanDetails, jikanSearch, jikanSeason, jikanUpcoming } from "./jikan";
+import { KITSU_OFFSET, kitsuDetails, kitsuSearch, kitsuSeason, kitsuUpcoming } from "./kitsu";
 import type { AniDetails, AniMedia, AnimeEpisode, Anticipated, HomeMovie, MovieDetails, Premiere, ScoreItem, Scores, TmdbMovie, TmEpisode, TmShow } from "./types";
 import { addDays, seasonOf, usToday } from "./dates";
 
@@ -108,6 +109,8 @@ async function ani<T>(query: string, variables: Record<string, unknown> = {}): P
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ query, variables }),
+    // Se o AniList estiver em baixo, não ficamos à espera para sempre
+    signal: AbortSignal.timeout(10000),
   });
   if (!res.ok) throw new HttpError(res.status);
   const json = await res.json();
@@ -116,14 +119,25 @@ async function ani<T>(query: string, variables: Record<string, unknown> = {}): P
 
 export const aniTitle = (m: AniMedia) => m.title.english || m.title.romaji || "";
 
-/** Tenta o AniList; se falhar (ex.: está em baixo), usa o MyAnimeList através do Jikan. */
-async function aniOr<T>(primary: () => Promise<T>, fallback: () => Promise<T>): Promise<T> {
-  try { return await primary(); } catch { return fallback(); }
+/**
+ * Tenta as fontes por ordem: AniList → MyAnimeList (Jikan) → Kitsu.
+ * Uma lista vazia também conta como falha quando `needData` (temporada e mais aguardados nunca estão vazios).
+ */
+async function aniOr<T>(sources: (() => Promise<T>)[], needData = true): Promise<T> {
+  let lastErr: unknown = new Error("Sem fontes de anime");
+  for (const src of sources) {
+    try {
+      const r = await src();
+      if (needData && Array.isArray(r) && r.length === 0) { lastErr = new Error("Sem resultados"); continue; }
+      return r;
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr;
 }
 
 /** Animes da temporada atual e os que continuam no ar da anterior. */
 export function animeSeason(): Promise<AniMedia[]> {
-  return aniOr(() => aniSeason(), () => cached("anime:season:mal", 3 * 3600_000, jikanSeason));
+  return aniOr([() => aniSeason(), () => cached("anime:season:mal", 3 * 3600_000, jikanSeason), () => cached("anime:season:kitsu", 3 * 3600_000, kitsuSeason)]);
 }
 
 function aniSeason(): Promise<AniMedia[]> {
@@ -170,7 +184,7 @@ export function animeSchedule(): Promise<AnimeEpisode[]> {
 
 /** Animes que ainda não estrearam, por popularidade. */
 export function animeUpcoming(): Promise<AniMedia[]> {
-  return aniOr(() => aniUpcoming(), () => cached("anime:upcoming:mal", 6 * 3600_000, jikanUpcoming));
+  return aniOr([() => aniUpcoming(), () => cached("anime:upcoming:mal", 6 * 3600_000, jikanUpcoming), () => cached("anime:upcoming:kitsu", 6 * 3600_000, kitsuUpcoming)]);
 }
 
 function aniUpcoming(): Promise<AniMedia[]> {
@@ -184,7 +198,7 @@ function aniUpcoming(): Promise<AniMedia[]> {
 
 /** Procura animes pelo nome (AniList). */
 export function searchAnime(q: string): Promise<AniMedia[]> {
-  return aniOr(() => aniSearch(q), () => jikanSearch(q));
+  return aniOr([() => aniSearch(q), () => jikanSearch(q), () => kitsuSearch(q)], false);
 }
 
 async function aniSearch(q: string): Promise<AniMedia[]> {
@@ -197,6 +211,7 @@ async function aniSearch(q: string): Promise<AniMedia[]> {
 /** Tudo o que a página do anime mostra; cache de 12 horas. */
 export function animeDetails(id: number): Promise<AniDetails> {
   // id negativo = anime do MyAnimeList (veio do Jikan)
+  if (id <= -KITSU_OFFSET) return cached(`anime:kitsu:${-id - KITSU_OFFSET}`, 12 * 3600_000, () => kitsuDetails(-id - KITSU_OFFSET));
   if (id < 0) return cached(`anime:mal:${-id}`, 12 * 3600_000, () => jikanDetails(-id));
   return cached(`anime:${id}`, 12 * 3600_000, async () => {
     const query = `query ($id: Int) { Media(id: $id, type: ANIME) { ${ANI_FIELDS} idMal bannerImage description(asHtml: false) season seasonYear duration

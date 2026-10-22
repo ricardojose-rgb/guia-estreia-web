@@ -9,7 +9,7 @@ let chain: Promise<unknown> = Promise.resolve();
 function jikan<T>(path: string): Promise<T> {
   const run = async (): Promise<T> => {
     for (let attempt = 0; ; attempt++) {
-      const res = await fetch(`${BASE}${path}`, { headers: { Accept: "application/json" } });
+      const res = await fetch(`${BASE}${path}`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(12000) });
       if (res.status === 429 && attempt < 3) { await new Promise((r) => setTimeout(r, 1200 * (attempt + 1))); continue; }
       if (!res.ok) throw new Error(`Jikan ${res.status}`);
       return res.json() as Promise<T>;
@@ -95,7 +95,9 @@ const uniq = (list: AniMedia[]) => {
 
 export async function jikanSeason(): Promise<AniMedia[]> {
   const pages = await Promise.all([1, 2].map((p) => jikan<{ data: JAnime[] }>(`/seasons/now?sfw=true&limit=25&page=${p}`).catch(() => ({ data: [] }))));
-  return uniq(pages.flatMap((p) => p.data.map(fromJikan))).filter((m) => ["TV", "ONA"].includes(m.format ?? ""));
+  const out = uniq(pages.flatMap((p) => p.data.map(fromJikan))).filter((m) => ["TV", "ONA"].includes(m.format ?? ""));
+  if (!out.length) throw new Error("Jikan sem resultados");
+  return out;
 }
 
 export async function jikanUpcoming(): Promise<AniMedia[]> {

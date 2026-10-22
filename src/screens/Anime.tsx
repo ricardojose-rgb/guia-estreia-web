@@ -103,7 +103,7 @@ export function AnimePage() {
         {m.siteUrl && m.id > 0 && <a className="btn ghost" href={m.siteUrl} target="_blank" rel="noopener">AniList <ExternalLink size={14} /></a>}
         {m.idMal && <a className="btn ghost" href={`https://myanimelist.net/anime/${m.idMal}`} target="_blank" rel="noopener">MyAnimeList <ExternalLink size={14} /></a>}
       </div>
-      <p className="small muted" style={{ marginTop: 18 }}>Dados de anime: {m.id > 0 ? "AniList" : "MyAnimeList (o AniList não está a responder)"}. Os episódios vêm do TVmaze quando segues o anime.</p>
+      <p className="small muted" style={{ marginTop: 18 }}>Dados de anime: {m.id > 0 ? "AniList" : m.id <= -10_000_000 ? "Kitsu (o AniList e o MyAnimeList não estão a responder)" : "MyAnimeList (o AniList não está a responder)"}. Os episódios vêm do TVmaze quando segues o anime.</p>
     </>
   );
 }

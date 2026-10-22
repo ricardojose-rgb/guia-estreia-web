@@ -197,7 +197,10 @@ export function AnimeDiscover() {
     );
   };
 
-  const groups = sort === "airing" ? groupBy(list, (m) => jpDayTime(new Date(m.nextAiringEpisode!.airingAt * 1000)).day) : null;
+  // Se a fonte não der as horas de emissão (Kitsu), mostra os que estão no ar sem agrupar por dia
+  const noTimes = sort === "airing" && !list.length && all.length > 0;
+  const shownList = noTimes ? all.filter((m) => m.status === "RELEASING").sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0)) : list;
+  const groups = sort === "airing" && !noTimes ? groupBy(list, (m) => jpDayTime(new Date(m.nextAiringEpisode!.airingAt * 1000)).day) : null;
   return (
     <>
       <div className="search" style={{ marginTop: 14 }}>
@@ -214,7 +217,7 @@ export function AnimeDiscover() {
         </>
       )}
       {q.trim().length < 2 && <>
-      <p className="eyebrow" style={{ marginTop: 14 }}>Temporada de {SEASON_PT[sn]} {year} · datas do Japão · dados {(season.data?.[0]?.id ?? 1) < 0 ? "MyAnimeList" : "AniList"}</p>
+      <p className="eyebrow" style={{ marginTop: 14 }}>Temporada de {SEASON_PT[sn]} {year} · datas do Japão · dados {(season.data?.[0]?.id ?? 1) <= -10_000_000 ? "Kitsu" : (season.data?.[0]?.id ?? 1) < 0 ? "MyAnimeList" : "AniList"}</p>
       <Carousel title="Mais aguardados" items={(upcoming.data ?? []).map((m, i) => ({
         key: `u${m.id}`, title: aniTitle(m), image: m.coverImage?.extraLarge ?? m.coverImage?.large, large: m.coverImage?.extraLarge,
         line1: dateLabel(m) ?? "Data por anunciar", line2: m.format === "MOVIE" ? "Filme" : m.format === "ONA" ? "Streaming" : "Série",
@@ -226,7 +229,7 @@ export function AnimeDiscover() {
       {season.error != null && <Empty title="Não foi possível carregar" body={friendlyError(season.error)} action={<button className="btn tonal" onClick={season.reload}>Tentar outra vez</button>} />}
       {groups
         ? groups.map(([day, items]) => <Fragment key={day}><DayHeader date={day} today={today} /><div className="rows cards">{items.map(row)}</div></Fragment>)
-        : <div className="rows cards" style={{ marginTop: 12 }}>{list.map(row)}</div>}
+        : <div className="rows cards" style={{ marginTop: 12 }}>{shownList.map(row)}</div>}
       </>}
     </>
   );
