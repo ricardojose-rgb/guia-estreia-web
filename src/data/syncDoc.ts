@@ -19,7 +19,8 @@ export interface SyncDoc {
   moviesRemoved?: Record<string, number>;
   moviesWatched?: Record<string, number>;
   moviesUnwatched?: Record<string, number>;
-  keys: { tmdb?: string | null; omdb?: string | null; mdblist?: string | null };
+  // tmdb, omdb, mdblist e as do servidor de casa (seerrUrl/Key, sonarrUrl/Key, jellyfinUrl/Key), que a app do telemóvel usa
+  keys: { tmdb?: string | null; omdb?: string | null; mdblist?: string | null; [k: string]: string | null | undefined };
 }
 
 export const emptyDoc = (): SyncDoc => ({ v: 2, updatedAt: 0, shows: {}, removed: {}, watched: {}, unwatched: {}, animeLinks: {},
@@ -74,7 +75,7 @@ export function merge(a: SyncDoc, b: SyncDoc): SyncDoc {
     const u = out.unwatched[id];
     if (u != null) { if (u >= out.watched[id][1]) delete out.watched[id]; else delete out.unwatched[id]; }
   }
-  out.keys = { tmdb: a.keys.tmdb || b.keys.tmdb || null, omdb: a.keys.omdb || b.keys.omdb || null, mdblist: a.keys.mdblist || b.keys.mdblist || null };
+  out.keys = mergeKeys(a.keys, b.keys);
   out.updatedAt = Math.max(a.updatedAt, b.updatedAt);
   return out;
 }
@@ -86,6 +87,13 @@ export function canonical(d: SyncDoc): string {
     v: 2, shows: sort(d.shows), removed: sort(d.removed), watched: sort(d.watched), unwatched: sort(d.unwatched),
     animeLinks: sort(d.animeLinks),
     movies: sort(d.movies ?? {}), moviesRemoved: sort(d.moviesRemoved ?? {}), moviesWatched: sort(d.moviesWatched ?? {}), moviesUnwatched: sort(d.moviesUnwatched ?? {}),
-    keys: { tmdb: d.keys.tmdb || null, omdb: d.keys.omdb || null, mdblist: d.keys.mdblist || null },
+    keys: sort(mergeKeys(d.keys, {})),
   });
+}
+
+/** Junta todas as chaves (também as que só a app do telemóvel conhece), para nenhuma se perder ao sincronizar. */
+function mergeKeys(a: SyncDoc["keys"], b: SyncDoc["keys"]): SyncDoc["keys"] {
+  const out: SyncDoc["keys"] = { tmdb: null, omdb: null, mdblist: null };
+  for (const k of new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})])) out[k] = a?.[k] || b?.[k] || null;
+  return out;
 }
