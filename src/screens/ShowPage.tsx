@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { openResolved, rtSearch, rtUrl, tmdbTvId, watchUrl } from "../data/links";
+import { openResolved, rtSearch, rtUrl, watchUrl } from "../data/links";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Check, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 import type { Episode, Scores, TmShow } from "../data/types";
 import { channelOf, friendlyError, scoresForShow, TvMaze } from "../data/api";
 import { catchUp, follow, getState, markWatched, setWatched, toEpisodes, unfollow, useStore } from "../data/store";
 import { episodeCode, episodeTitle, ptAirTime, relativeDay, shortDate, statusPt, stripHtml, usToday } from "../data/dates";
-import { Empty, Poster, ScoreChips, SeerrButton, Spinner } from "../ui/components";
+import { Empty, Poster, ScoreChips, Spinner } from "../ui/components";
 
 export default function ShowPage() {
   const id = Number(useParams().id);
@@ -79,7 +79,6 @@ export default function ShowPage() {
                 ? <button className="btn tonal" onClick={() => unfollow(id)}><Check size={17} strokeWidth={3} />A seguir</button>
                 : <button className="btn filled" disabled={pending} onClick={() => follow(show, aniId)}>{pending ? "A adicionar…" : "Seguir"}</button>}
               {followed && behind > 0 && <button className="btn ghost" onClick={() => catchUp(id)}>Já vi tudo até hoje</button>}
-              <SeerrButton kind="tv" title={show.name} resolve={() => tmdbTvId({ imdb: show.externals?.imdb, tvmaze: id, tvdb: show.externals?.thetvdb }, getState().prefs.tmdbToken)} />
             </div>
           </div>
         </div>

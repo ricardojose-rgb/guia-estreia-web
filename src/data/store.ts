@@ -325,7 +325,6 @@ function toDoc(s: State): SyncDoc {
   for (const [id, at] of Object.entries(s.moviesWatched)) d.moviesWatched![id] = at;
   for (const [id, at] of Object.entries(s.moviesUnwatched)) d.moviesUnwatched![id] = at;
   d.keys = { tmdb: s.prefs.tmdbToken || null, omdb: s.prefs.omdbKey || null, mdblist: s.prefs.mdblistKey || null };
-  if (s.prefs.seerrUrl) d.keys.seerrUrl = s.prefs.seerrUrl;
   return d;
 }
 
@@ -353,7 +352,7 @@ function applyDoc(d: SyncDoc): number[] {
         animeLinks: Object.fromEntries(Object.entries(d.animeLinks).map(([k, v]) => [Number(k), v])),
         movies: Object.fromEntries(Object.entries(d.movies ?? {}).map(([k, v]) => [Number(k), { id: Number(k), ...v }])),
         moviesRemoved: numKeys(d.moviesRemoved), moviesWatched: numKeys(d.moviesWatched), moviesUnwatched: numKeys(d.moviesUnwatched),
-        prefs: { ...s.prefs, tmdbToken: s.prefs.tmdbToken || d.keys.tmdb || "", mdblistKey: s.prefs.mdblistKey || d.keys.mdblist || "", omdbKey: s.prefs.omdbKey || d.keys.omdb || "", seerrUrl: s.prefs.seerrUrl || d.keys.seerrUrl || "" },
+        prefs: { ...s.prefs, tmdbToken: s.prefs.tmdbToken || d.keys.tmdb || "", mdblistKey: s.prefs.mdblistKey || d.keys.mdblist || "", omdbKey: s.prefs.omdbKey || d.keys.omdb || "" },
       };
     });
   } finally { applyingRemote = false; }

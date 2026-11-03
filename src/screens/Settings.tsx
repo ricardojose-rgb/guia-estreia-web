@@ -69,12 +69,12 @@ function SyncCard() {
   );
 }
 
-function KeyField({ label, value, onSave, placeholder, plain = false }: { label: string; value: string; onSave: (v: string) => void; placeholder: string; plain?: boolean }) {
+function KeyField({ label, value, onSave, placeholder }: { label: string; value: string; onSave: (v: string) => void; placeholder: string }) {
   const [v, setV] = useState(value);
   const [saved, setSaved] = useState(false);
   return (
     <div className="line" style={{ flexWrap: "wrap" }}>
-      <input className="field" style={{ flex: "1 1 260px" }} type={plain ? "text" : "password"} aria-label={label} placeholder={placeholder}
+      <input className="field" style={{ flex: "1 1 260px" }} type="password" aria-label={label} placeholder={placeholder}
         value={v} onChange={(e) => { setV(e.target.value); setSaved(false); }} autoComplete="off" />
       <button className="btn filled" onClick={() => { onSave(v.trim()); setSaved(true); }}>{saved ? "Guardado" : "Guardar"}</button>
     </div>
@@ -185,17 +185,6 @@ export default function Settings() {
         <h3>Filmes e mais aguardadas (TMDB)</h3>
         <p className="small muted" style={{ margin: 0 }}>Cola o "API Read Access Token" do TMDB (o texto comprido que começa por eyJ). Se o importares da app do telemóvel, não precisas de fazer nada aqui.</p>
         <KeyField label="Chave do TMDB" placeholder="API Read Access Token" value={prefs.tmdbToken} onSave={(v) => setPrefs({ tmdbToken: v })} />
-      </div>
-
-      <div className="card setting">
-        <h3>Servidor de casa (Seerr)</h3>
-        <p className="small muted" style={{ margin: 0 }}>
-          Mostra o botão <b>Pedir no servidor</b> nas páginas das séries e dos filmes. No computador abre a página no próprio Seerr,
-          onde carregas em <b>Request</b> (o navegador não deixa o site falar diretamente com o servidor). Precisa do Tailscale ligado.
-          O endereço vem sozinho da app do telemóvel.
-        </p>
-        <KeyField plain label="Endereço do Seerr" placeholder="http://100.117.235.71:5055" value={prefs.seerrUrl ?? ""}
-          onSave={(v) => setPrefs({ seerrUrl: v.trim() && !/^https?:\/\//.test(v.trim()) ? `http://${v.trim()}` : v.trim() })} />
       </div>
 
       <div className="card setting">

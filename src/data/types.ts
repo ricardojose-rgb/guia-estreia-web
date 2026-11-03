@@ -66,8 +66,6 @@ export interface Prefs {
   omdbKey: string;
   mdblistKey: string;
   hideSpoilers: boolean;
-  /** Endereço do Seerr do servidor de casa (vem da app do telemóvel pela sincronização). */
-  seerrUrl?: string;
 }
 
 // ---- TVmaze ----
