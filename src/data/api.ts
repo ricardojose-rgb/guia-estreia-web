@@ -234,19 +234,32 @@ export function cleanAnimeTitle(t: string): string {
 
 /** Id do TVmaze de um anime (procura uma vez e guarda durante 3 dias; null se ainda não existir). */
 export function animeTvmazeId(m: AniMedia): Promise<number | null> {
-  return cached(`anitv:${m.id}`, 3 * 86400_000, async () => (await findAnimeShow(m))?.id ?? null);
+  return cached(`anitv2:${m.id}`, 3 * 86400_000, async () => (await findAnimeShow(m))?.id ?? null);
 }
 
 /** Encontra no TVmaze a série correspondente a um anime. */
 export async function findAnimeShow(m: AniMedia): Promise<TmShow | null> {
   const names = [m.title.english, m.title.romaji].filter(Boolean) as string[];
   const candidates = [...new Set(names.flatMap((n) => [cleanAnimeTitle(n), n, n.split(":")[0].trim()]))].filter((c) => c.length >= 2);
+  // Não basta o primeiro anime da pesquisa: "The Ghost in the Shell" (2026) apareceria como "Stand Alone Complex".
+  // Junta os resultados de todas as pesquisas e escolhe o melhor: mesmo nome e mesmo ano de estreia.
+  const norm = (t: string) => t.toLowerCase().replace(/^the\s+/, "").replace(/[^a-z0-9]+/g, "");
+  const wanted = new Set(candidates.map(norm));
+  const year = m.startDate?.year ?? null;
+  const pool = new Map<number, { show: TmShow; score: number }>();
   for (const q of candidates) {
-    const hits = await TvMaze.search(q).catch(() => []);
-    const hit = hits.find((h) => h.show.type === "Animation" || h.show.language === "Japanese");
-    if (hit) return hit.show;
+    for (const h of await TvMaze.search(q).catch(() => [])) {
+      if (!(h.show.type === "Animation" || h.show.language === "Japanese")) continue;
+      const py = h.show.premiered ? Number(h.show.premiered.slice(0, 4)) : null;
+      let score = h.score ?? 0;
+      if (wanted.has(norm(h.show.name))) score += 5;
+      if (year && py) score += py === year ? 10 : Math.abs(py - year) === 1 ? 4 : -3;
+      const cur = pool.get(h.show.id);
+      if (!cur || score > cur.score) pool.set(h.show.id, { show: h.show, score });
+    }
   }
-  return null;
+  const best = [...pool.values()].sort((a, b) => b.score - a.score)[0];
+  return best?.show ?? null;
 }
 
 // ---------------- TMDB ----------------
