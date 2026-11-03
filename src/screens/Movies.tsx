@@ -6,7 +6,7 @@ import type { MovieDetails, MovieEntry, Scores } from "../data/types";
 import { friendlyError, movieDetails, scoresForMovie, tmdbPoster } from "../data/api";
 import { addMovie, removeMovie, setMovieWatched, toMovieEntry, useStore } from "../data/store";
 import { addDays, shortDate, usToday } from "../data/dates";
-import { DayHeader, Empty, Poster, ScoreChips, Segmented, Spinner, useAsync } from "../ui/components";
+import { DayHeader, Empty, Poster, ScoreChips, Segmented, SeerrButton, Spinner, useAsync } from "../ui/components";
 
 /** Estado de um filme em relação à casa: já disponível, data prevista, ou só no cinema. */
 export function homeStatus(d: MovieDetails | undefined, today: string, year: number): { text: string; ready: boolean } {
@@ -159,7 +159,7 @@ export function MoviePage() {
             <span className="muted">{[m.year, m.runtime ? `${Math.floor(m.runtime / 60)} h ${m.runtime % 60} min` : null, m.genres.slice(0, 3).join(", ")].filter(Boolean).join(" · ")}</span>
             <ScoreChips scores={scores} title={m.originalTitle || m.title} ids={{ imdb: m.imdbId, tmdbMovie: m.id }} />
             {st.text && <span style={{ fontWeight: 800, color: st.ready ? "var(--new)" : "var(--primary)" }}>{st.ready ? "✓ " : ""}{st.text}</span>}
-            <MovieButtons entry={entry} />
+            <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><MovieButtons entry={entry} /><SeerrButton kind="movie" title={m.title} tmdbId={m.id} /></span>
           </div>
         </div>
       </div>

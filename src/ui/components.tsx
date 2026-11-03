@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { carouselPos } from "./memory";
 import { openResolved, rtSearch, rtUrl, type Ids } from "../data/links";
-import { Check, ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Download, Plus, X } from "lucide-react";
 import { largeImage } from "../data/api";
 import { dismissToast, useStore } from "../data/store";
 import type { Scores } from "../data/types";
@@ -273,4 +273,28 @@ export function useAsync<T>(load: () => Promise<T>, deps: unknown[]) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, n]);
   return { ...state, reload: () => setN((x) => x + 1) };
+}
+
+/**
+ * Pedir ao servidor de casa: no computador o site não pode falar diretamente com o Seerr
+ * (o site é https e o servidor é http, e o Seerr não aceita pedidos de outros sites),
+ * por isso abre a página do filme ou da série no próprio Seerr, onde se carrega em "Request".
+ */
+export function SeerrButton({ kind, title, tmdbId, resolve }: { kind: "movie" | "tv"; title: string; tmdbId?: number | null; resolve?: () => Promise<number | null> }) {
+  const url = useStore((s) => s.prefs.seerrUrl);
+  if (!url) return null;
+  const base = url.replace(/\/+$/, "");
+  const open = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    const w = window.open("about:blank", "_blank");
+    const id = tmdbId ?? (await resolve?.().catch(() => null));
+    const target = id ? `${base}/${kind}/${id}` : `${base}/search?query=${encodeURIComponent(title)}`;
+    if (w) w.location.href = target; else window.open(target, "_blank");
+  };
+  return (
+    <a className="btn tonal" href={tmdbId ? `${base}/${kind}/${tmdbId}` : base} target="_blank" rel="noopener" onClick={open}
+      title="Abre no Seerr do servidor de casa (precisa do Tailscale ligado)">
+      <Download size={17} />Pedir no servidor
+    </a>
+  );
 }

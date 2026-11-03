@@ -63,14 +63,20 @@ export async function rtUrl(ids: Ids, title: string): Promise<string> {
 }
 
 /** Página "onde ver" em Portugal (dados do JustWatch, mostrados pelo TMDB). */
+/** Id do TMDB de uma série (pelo Wikidata, ou pelo TMDB a partir do IMDb ou do TheTVDB). */
+export async function tmdbTvId(ids: Ids & { tvdb?: number | null }, tmdbToken?: string): Promise<number | null> {
+  let tv = ids.tmdbTv ?? (await lookup(ids)).tmdbTv;
+  const find = (ext: string, source: string) => fetch(`https://api.themoviedb.org/3/find/${ext}?external_source=${source}`, {
+    headers: { Authorization: `Bearer ${tmdbToken}`, accept: "application/json" },
+  }).then((r) => r.ok ? r.json() : null).then((j) => (j?.tv_results?.[0]?.id as number) ?? null).catch(() => null);
+  if (!tv && tmdbToken && ids.imdb) tv = await find(ids.imdb, "imdb_id");
+  if (!tv && tmdbToken && ids.tvdb) tv = await find(String(ids.tvdb), "tvdb_id");
+  return tv ?? null;
+}
+
 export async function watchUrl(ids: Ids, title: string, kind: "movie" | "tv", tmdbToken?: string): Promise<string> {
   if (kind === "movie" && ids.tmdbMovie) return `https://www.themoviedb.org/movie/${ids.tmdbMovie}/watch?locale=PT`;
-  let tv = ids.tmdbTv ?? (await lookup(ids)).tmdbTv;
-  if (!tv && tmdbToken && ids.imdb) {
-    tv = await fetch(`https://api.themoviedb.org/3/find/${ids.imdb}?external_source=imdb_id`, {
-      headers: { Authorization: `Bearer ${tmdbToken}`, accept: "application/json" },
-    }).then((r) => r.ok ? r.json() : null).then((j) => j?.tv_results?.[0]?.id ?? null).catch(() => null);
-  }
+  const tv = await tmdbTvId(ids, tmdbToken);
   if (tv) return `https://www.themoviedb.org/tv/${tv}/watch?locale=PT`;
   return `https://www.google.com/search?q=${encodeURIComponent(`${title} site:justwatch.com/pt`)}`;
 }
