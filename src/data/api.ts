@@ -326,6 +326,30 @@ export function anticipatedSeries(token: string): Promise<Anticipated[]> {
 }
 
 /** Converte uma série do TMDB no id do TVmaze. */
+/** Um título mítico (série ou filme) para rever. */
+export interface Classic { id: number; title: string; originalTitle: string; poster: string | null; year: string | null; vote: number }
+
+/**
+ * Séries e filmes míticos (com pelo menos 3 anos): "rated" = mais bem cotados, "loved" = mais votados (os mais amados).
+ * Nas séries fica de fora a animação (o anime tem a sua zona), notícias, reality e talk shows.
+ */
+export function classics(token: string, kind: "tv" | "movie", mode: "rated" | "loved"): Promise<Classic[]> {
+  return cached(`classics:${kind}:${mode}`, 7 * 86400_000, async () => {
+    const before = addDays(usToday(), -3 * 365);
+    const sort = mode === "rated" ? "vote_average.desc" : "vote_count.desc";
+    const q = kind === "tv"
+      ? `discover/tv?language=pt-PT&include_adult=false&sort_by=${sort}&vote_count.gte=${mode === "rated" ? 1500 : 500}&without_genres=16|10763|10764|10767&first_air_date.lte=${before}`
+      : `discover/movie?language=pt-PT&include_adult=false&sort_by=${sort}&vote_count.gte=${mode === "rated" ? 5000 : 1000}&primary_release_date.lte=${before}`;
+    type R = { id: number; name?: string; title?: string; original_name?: string; original_title?: string; poster_path?: string | null; first_air_date?: string; release_date?: string; vote_average?: number };
+    const pages = await Promise.all([1, 2].map((p) => tmdb<{ results: R[] }>(token, `${q}&page=${p}`).catch(() => ({ results: [] as R[] }))));
+    const seen = new Set<number>();
+    return pages.flatMap((p) => p.results).filter((r) => !seen.has(r.id) && (seen.add(r.id), true)).map((r) => ({
+      id: r.id, title: r.name ?? r.title ?? "", originalTitle: r.original_name ?? r.original_title ?? r.name ?? r.title ?? "",
+      poster: r.poster_path ?? null, year: (r.first_air_date ?? r.release_date ?? "").slice(0, 4) || null, vote: r.vote_average ?? 0,
+    }));
+  });
+}
+
 export async function tvmazeIdFor(token: string, a: Anticipated): Promise<number | null> {
   const ext = await tmdb<{ imdb_id?: string | null; tvdb_id?: number | null }>(token, `tv/${a.tmdbId}/external_ids`).catch(() => null);
   const found = await TvMaze.lookup(ext?.imdb_id, ext?.tvdb_id).catch(() => null);

@@ -107,3 +107,10 @@ export function ScrollMemory() {
 
   return null;
 }
+
+/** Valor que só muda quando se para de escrever (evita uma pesquisa por cada letra). */
+export function useDebounced<T>(value: T, ms = 400): T {
+  const [v, setV] = useState(value);
+  useEffect(() => { const h = setTimeout(() => setV(value), ms); return () => clearTimeout(h); }, [value, ms]);
+  return v;
+}

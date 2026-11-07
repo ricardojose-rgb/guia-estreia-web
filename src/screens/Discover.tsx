@@ -7,6 +7,7 @@ import { follow, say, useStore } from "../data/store";
 import { shortDate, statusPt, usToday } from "../data/dates";
 import { Carousel, Empty, FollowButton, Poster, Spinner, useAsync } from "../ui/components";
 import { PremiereRow } from "./Lists";
+import { ClassicsSection } from "./Classics";
 import { useSessionState } from "../ui/memory";
 import { Link } from "react-router-dom";
 
@@ -25,11 +26,13 @@ export function SeriesDiscover() {
   useEffect(() => {
     const t = q.trim();
     if (t.length < 2) { setResults(null); return; }
-    setResults({ loading: true });
+    setResults((r) => ({ ...r, loading: true }));
+    let alive = true;
     const h = setTimeout(() => {
-      TvMaze.search(t).then((r) => setResults({ loading: false, hits: r.map((x) => x.show) }), (error) => setResults({ loading: false, error }));
+      // Só mostra a resposta da última pesquisa (uma resposta antiga mais lenta não a substitui)
+      TvMaze.search(t).then((r) => alive && setResults({ loading: false, hits: r.map((x) => x.show) }), (error) => alive && setResults({ loading: false, error }));
     }, 350);
-    return () => clearTimeout(h);
+    return () => { alive = false; clearTimeout(h); };
   }, [q]);
 
   const openAnticipated = async (a: Anticipated) => {
@@ -50,7 +53,7 @@ export function SeriesDiscover() {
     <>
       <div className="search" style={{ marginTop: 14 }}>
         <Search size={19} className="muted" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Procurar uma série" aria-label="Procurar uma série" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setQ(""); }} placeholder="Procurar uma série" aria-label="Procurar uma série" />
         {q && <button aria-label="Limpar pesquisa" onClick={() => setQ("")}><X size={18} /></button>}
       </div>
 
@@ -87,6 +90,7 @@ export function SeriesDiscover() {
               {ant.loading && <Spinner />}
               <Carousel title="Séries novas mais aguardadas" items={(ant.data ?? []).filter((a) => a.isNew).map(toItem)} />
               <Carousel title="Temporadas mais aguardadas" items={(ant.data ?? []).filter((a) => !a.isNew).map(toItem)} />
+              <ClassicsSection kind="tv" />
             </>
           )}
           <PremiereSection title="Séries novas nas próximas 3 semanas" list={prem.data?.filter((p) => p.isNew)} loading={prem.loading} shows={shows} pending={pending} />

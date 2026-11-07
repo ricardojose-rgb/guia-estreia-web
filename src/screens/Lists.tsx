@@ -9,8 +9,9 @@ import {
 import { followAnime, followById, setWatched, markWatched, toMovieEntry, useStore } from "../data/store";
 import { agendaEpisodes, type AgendaEpisode } from "../data/selectors";
 import { addDays, jpDayTime, jpToday, episodeCode, episodeTitle, MONTHS_SHORT, ptAirTime, ptDayTime, ptToday, SEASON_PT, seasonOf, shortDate, usToday } from "../data/dates";
-import { useSessionState } from "../ui/memory";
+import { useDebounced, useSessionState } from "../ui/memory";
 import { isAnime } from "./MyShows";
+import { ClassicsSection } from "./Classics";
 import { AniScore, Carousel, Chips, DayHeader, Empty, FollowButton, Poster, ScoreChips, Spinner, Tag, useAsync } from "../ui/components";
 import { Check } from "lucide-react";
 
@@ -158,7 +159,8 @@ export function AnimeDiscover() {
   const [sort, setSort] = useSessionState<AnimeSort>("sort:anime", "airing");
   const [q, setQ] = useSessionState("q:anime", "");
   const nav = useNavigate();
-  const results = useAsync(() => (q.trim().length >= 2 ? new Promise<AniMedia[]>((res, rej) => setTimeout(() => searchAnime(q.trim()).then(res, rej), 350)) : Promise.resolve(null)), [q]);
+  const term = useDebounced(q.trim(), 450);
+  const results = useAsync(() => (term.length >= 2 ? searchAnime(term) : Promise.resolve(null)), [term]);
   const season = useAsync(() => animeSeason(), []);
   const upcoming = useAsync(() => animeUpcoming(), []);
   const links = useStore((s) => s.animeLinks);
@@ -205,7 +207,7 @@ export function AnimeDiscover() {
     <>
       <div className="search" style={{ marginTop: 14 }}>
         <Search size={19} className="muted" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Procurar um anime" aria-label="Procurar um anime" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setQ(""); }} placeholder="Procurar um anime" aria-label="Procurar um anime" />
         {q && <button aria-label="Limpar pesquisa" onClick={() => setQ("")}><X size={18} /></button>}
       </div>
       {q.trim().length >= 2 && (
@@ -253,7 +255,8 @@ export function MoviesList({ withAnticipated = false }: { withAnticipated?: bool
   const movies = useAsync(() => (token ? homeReleases(token) : Promise.resolve([] as HomeMovie[])), [token]);
   const ant = useAsync(() => (token && withAnticipated ? anticipatedHome(token) : Promise.resolve([] as HomeMovie[])), [token, withAnticipated]);
   const [q, setQ] = useSessionState("q:movies", "");
-  const results = useAsync(() => (q.trim().length >= 2 ? new Promise<TmdbMovie[]>((res, rej) => setTimeout(() => searchMovies(token, q.trim()).then(res, rej), 350)) : Promise.resolve(null)), [q]);
+  const term = useDebounced(q.trim(), 400);
+  const results = useAsync(() => (term.length >= 2 ? searchMovies(token, term) : Promise.resolve(null)), [term]);
   const today = usToday();
   const year = Number(today.slice(0, 4));
 
@@ -274,7 +277,7 @@ export function MoviesList({ withAnticipated = false }: { withAnticipated?: bool
       {withAnticipated && (
         <div className="search" style={{ marginTop: 14 }}>
           <Search size={19} className="muted" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Procurar um filme" aria-label="Procurar um filme" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setQ(""); }} placeholder="Procurar um filme" aria-label="Procurar um filme" />
           {q && <button aria-label="Limpar pesquisa" onClick={() => setQ("")}><X size={18} /></button>}
         </div>
       )}
@@ -304,6 +307,7 @@ export function MoviesList({ withAnticipated = false }: { withAnticipated?: bool
         line2: m.theatricalDate ? `Cinema: ${shortDate(m.theatricalDate, year)}` : null,
         rank: i + 1, onClick: () => nav(`/filme/${m.id}`),
       }))} />}
+      {withAnticipated && <ClassicsSection kind="movie" />}
       {movies.loading && <div className="small muted" style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 14 }}><span className="spinner" />A procurar as datas de digital e Blu-ray…</div>}
       {movies.error != null && <Empty title="Não foi possível carregar" body={friendlyError(movies.error)} action={<button className="btn tonal" onClick={movies.reload}>Tentar outra vez</button>} />}
       {coming.length > 0 && <h2 className="h2">Chegam em breve</h2>}
