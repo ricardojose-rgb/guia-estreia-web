@@ -150,7 +150,7 @@ export default function Settings() {
       const n = await importBackup(await file.text());
       setStatus(n === 1 ? "Importada 1 série." : `Importadas ${n} séries.`);
     } catch {
-      setStatus("Este ficheiro não é uma cópia de segurança do Watchlist.");
+      setStatus("Este ficheiro não é uma cópia de segurança do Estreias TV.");
     }
   };
 

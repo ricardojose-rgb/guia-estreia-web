@@ -1,6 +1,6 @@
-# Watchlist (web)
+# Estreias TV (web)
 
-(Antes chamava-se Guia de Estreias (e, por pouco tempo, Showrunner).)
+(Antes chamava-se Guia de Estreias (e, por pouco tempo, Showrunner e Watchlist).)
 
 Versão para computador (PC e Mac) do Guia de Estreias: séries, anime e filmes com as datas de estreia dos EUA e a hora em Portugal.
 

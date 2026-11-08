@@ -1,6 +1,6 @@
 {
-  "name": "Watchlist",
-  "short_name": "Watchlist",
+  "name": "Estreias TV",
+  "short_name": "Estreias TV",
   "description": "Séries, anime e filmes: o que sai, quando sai e o que te falta ver.",
   "start_url": "./",
   "scope": "./",
