@@ -1,7 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108">
-  <rect width="108" height="108" rx="24" fill="#4353E8"/>
-  <path fill="#fff" d="M36 34h36a4 4 0 0 1 4 4v32a4 4 0 0 1-4 4H36a4 4 0 0 1-4-4V38a4 4 0 0 1 4-4z"/>
-  <path fill="#FFC94D" d="M36 34h36a4 4 0 0 1 4 4v6H32v-6a4 4 0 0 1 4-4z"/>
-  <path fill="#fff" d="M42 29h4v9h-4zM62 29h4v9h-4z"/>
-  <path fill="#4353E8" d="M49 50l13 8-13 8z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFB547"/><stop offset="1" stop-color="#FF7A45"/></linearGradient></defs>
+  <rect width="512" height="512" rx="116" fill="url(#g)"/>
+  <g fill="none" stroke="#1D1F2B" stroke-width="30" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M150 130V300M362 130V300M150 300L362 420M362 300L150 420"/>
+  </g>
+  <rect x="138" y="130" width="236" height="78" rx="18" fill="#1D1F2B"/>
+  <rect x="130" y="272" width="252" height="40" rx="14" fill="#1D1F2B"/>
+  <path d="M240 152l36 17-36 17z" fill="#FFB547"/>
 </svg>

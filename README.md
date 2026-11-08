@@ -1,4 +1,6 @@
-# Guia de Estreias (web)
+# Showrunner (web)
+
+(Antes chamava-se Guia de Estreias.)
 
 Versão para computador (PC e Mac) do Guia de Estreias: séries, anime e filmes com as datas de estreia dos EUA e a hora em Portugal.
 

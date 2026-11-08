@@ -104,7 +104,7 @@
     if (!res.ok) throw new Error("O GitHub respondeu com o erro " + res.status + ".");
     var g = await res.json();
     var f = g.files && g.files[SYNC_FILE];
-    if (!f) throw new Error("Esse gist não tem os dados do Guia de Estreias.");
+    if (!f) throw new Error("Esse gist não tem os dados do Showrunner.");
     if (f.truncated && f.raw_url) {
       var raw = await fetch(f.raw_url, { cache: "no-store" });
       return JSON.parse(await raw.text());
@@ -338,7 +338,7 @@
 
   function settingsView() {
     var n = data.doc ? Object.keys(resolveDoc(data.doc).shows).length : 0;
-    return '<div class="form"><h2 class="h2">Ligar ao Guia de Estreias</h2>' +
+    return '<div class="form"><h2 class="h2">Ligar ao Showrunner</h2>' +
       "<p>Escreve o código do teu gist de sincronização. Encontras-o no site, em <code>Definições → Sincronização → Código para a app da TV</code>. Também aceito o link do gist.</p>" +
       "<p>Dica: a app SmartThings no telemóvel tem teclado para escrever na TV.</p>" +
       '<input class="field focusable" id="gist" data-key="gist" type="text" autocomplete="off" spellcheck="false" placeholder="ex.: 3f9a…" value="' + esc(cfg.gistId) + '">' +
