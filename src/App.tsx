@@ -90,7 +90,7 @@ function Shell() {
     <div className="app">
       <ScrollMemory />
       <aside className="sidebar">
-        <div className="brand"><img src="./icon.svg" alt="" />Showrunner</div>
+        <div className="brand"><img src="./icon.svg" alt="" />Watchlist</div>
         {NAV.map(({ to, label, icon: Icon, end }) => (
           <NavLink key={to} to={to} end={end} className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}>
             <Icon size={20} />{label}

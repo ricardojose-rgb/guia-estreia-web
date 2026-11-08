@@ -1,6 +1,6 @@
 {
-  "name": "Showrunner",
-  "short_name": "Showrunner",
+  "name": "Watchlist",
+  "short_name": "Watchlist",
   "description": "Séries, anime e filmes: o que sai, quando sai e o que te falta ver.",
   "start_url": "./",
   "scope": "./",
