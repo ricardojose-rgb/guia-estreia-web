@@ -278,7 +278,7 @@ export function upcomingMovies(token: string): Promise<TmdbMovie[]> {
   return cached("movies:upcoming", 12 * 3600_000, async () => {
     const today = usToday();
     const pages = await Promise.all([1, 2, 3].map((p) =>
-      tmdb<{ results: TmdbMovie[] }>(token, `movie/upcoming?language=pt-PT&region=US&page=${p}`).catch((e) => { if (p === 1) throw e; return { results: [] }; })));
+      tmdb<{ results: TmdbMovie[] }>(token, `movie/upcoming?language=en-US&region=US&page=${p}`).catch((e) => { if (p === 1) throw e; return { results: [] }; })));
     const seen = new Set<number>();
     return pages.flatMap((p) => p.results)
       .filter((m) => !seen.has(m.id) && seen.add(m.id) && (m.release_date ?? "") >= today)
@@ -291,7 +291,7 @@ export function anticipatedMovies(token: string): Promise<TmdbMovie[]> {
   return cached("movies:anticipated", 12 * 3600_000, async () => {
     const t = usToday();
     const r = await tmdb<{ results: TmdbMovie[] }>(token,
-      `discover/movie?language=pt-PT&region=US&sort_by=popularity.desc&include_adult=false&with_release_type=2|3&primary_release_date.gte=${addDays(t, 1)}&primary_release_date.lte=${addDays(t, 180)}`);
+      `discover/movie?language=en-US&region=US&sort_by=popularity.desc&include_adult=false&with_release_type=2|3&primary_release_date.gte=${addDays(t, 1)}&primary_release_date.lte=${addDays(t, 180)}`);
     return r.results.slice(0, 20);
   });
 }
@@ -301,7 +301,7 @@ export function anticipatedSeries(token: string): Promise<Anticipated[]> {
   return cached("series:anticipated", 12 * 3600_000, async () => {
     const today = usToday();
     const until = addDays(today, 120);
-    const base = "discover/tv?language=pt-PT&sort_by=popularity.desc&include_adult=false&with_type=2|4&without_genres=10763|10764|10767";
+    const base = "discover/tv?language=en-US&sort_by=popularity.desc&include_adult=false&with_type=2|4&without_genres=10763|10764|10767";
     type Tv = { id: number; name: string; original_name?: string; poster_path?: string | null; first_air_date?: string };
     const [n, r] = await Promise.all([
       tmdb<{ results: Tv[] }>(token, `${base}&first_air_date.gte=${today}&first_air_date.lte=${until}`),
@@ -338,8 +338,8 @@ export function classics(token: string, kind: "tv" | "movie", mode: "rated" | "l
     const before = addDays(usToday(), -3 * 365);
     const sort = mode === "rated" ? "vote_average.desc" : "vote_count.desc";
     const q = kind === "tv"
-      ? `discover/tv?language=pt-PT&include_adult=false&sort_by=${sort}&vote_count.gte=${mode === "rated" ? 1500 : 500}&without_genres=16|10763|10764|10767&first_air_date.lte=${before}`
-      : `discover/movie?language=pt-PT&include_adult=false&sort_by=${sort}&vote_count.gte=${mode === "rated" ? 5000 : 1000}&primary_release_date.lte=${before}`;
+      ? `discover/tv?language=en-US&include_adult=false&sort_by=${sort}&vote_count.gte=${mode === "rated" ? 1500 : 500}&without_genres=16|10763|10764|10767&first_air_date.lte=${before}`
+      : `discover/movie?language=en-US&include_adult=false&sort_by=${sort}&vote_count.gte=${mode === "rated" ? 5000 : 1000}&primary_release_date.lte=${before}`;
     type R = { id: number; name?: string; title?: string; original_name?: string; original_title?: string; poster_path?: string | null; first_air_date?: string; release_date?: string; vote_average?: number };
     const pages = await Promise.all([1, 2].map((p) => tmdb<{ results: R[] }>(token, `${q}&page=${p}`).catch(() => ({ results: [] as R[] }))));
     const seen = new Set<number>();
@@ -540,7 +540,7 @@ type Providers = { results?: Record<string, { flatrate?: { provider_name: string
 async function homeDetails(token: string, m: TmdbMovie): Promise<HomeMovie | null> {
   return cached(`home:${m.id}`, 24 * 3600_000, async () => {
     const d = await tmdb<TmdbMovie & { release_dates?: ReleaseDates; "watch/providers"?: Providers }>(token,
-      `movie/${m.id}?language=pt-PT&append_to_response=release_dates,watch/providers`);
+      `movie/${m.id}?language=en-US&append_to_response=release_dates,watch/providers`);
     const us = d.release_dates?.results?.find((r) => r.iso_3166_1 === "US")?.release_dates ?? [];
     const first = (types: number[]) => us.filter((x) => types.includes(x.type)).map((x) => x.release_date.slice(0, 10)).sort()[0] ?? null;
     const digitalDate = first([4]), physicalDate = first([5]), theatricalDate = first([2, 3]);
@@ -562,7 +562,7 @@ export function homeReleases(token: string): Promise<HomeMovie[]> {
     const from = addDays(today, -30), to = addDays(today, 90);
     const pages = await Promise.all([1, 2, 3].map((p) =>
       tmdb<{ results: TmdbMovie[] }>(token,
-        `discover/movie?language=pt-PT&region=US&with_release_type=4|5&release_date.gte=${from}&release_date.lte=${to}&sort_by=popularity.desc&include_adult=false&page=${p}`)
+        `discover/movie?language=en-US&region=US&with_release_type=4|5&release_date.gte=${from}&release_date.lte=${to}&sort_by=popularity.desc&include_adult=false&page=${p}`)
         .catch((e) => { if (p === 1) throw e; return { results: [] }; })));
     const seen = new Set<number>();
     const base = pages.flatMap((p) => p.results).filter((m) => !seen.has(m.id) && seen.add(m.id)).slice(0, 50);
@@ -580,7 +580,7 @@ export function anticipatedHome(token: string): Promise<HomeMovie[]> {
   const today = usToday();
   return cached(`home:anticipated:${today}`, 12 * 3600_000, async () => {
     const r = await tmdb<{ results: TmdbMovie[] }>(token,
-      `discover/movie?language=pt-PT&region=US&with_release_type=4|5&release_date.gte=${addDays(today, 1)}&release_date.lte=${addDays(today, 180)}&sort_by=popularity.desc&include_adult=false`);
+      `discover/movie?language=en-US&region=US&with_release_type=4|5&release_date.gte=${addDays(today, 1)}&release_date.lte=${addDays(today, 180)}&sort_by=popularity.desc&include_adult=false`);
     const list = await Promise.all(r.results.slice(0, 20).map((m) => homeDetails(token, m)));
     return list.filter((h): h is HomeMovie => !!h && h.homeDate > today);
   });
@@ -589,7 +589,7 @@ export function anticipatedHome(token: string): Promise<HomeMovie[]> {
 // ---------------- Filmes: pesquisa e detalhes ----------------
 
 export async function searchMovies(token: string, q: string): Promise<TmdbMovie[]> {
-  const r = await tmdb<{ results: TmdbMovie[] }>(token, `search/movie?language=pt-PT&include_adult=false&query=${encodeURIComponent(q)}`);
+  const r = await tmdb<{ results: TmdbMovie[] }>(token, `search/movie?language=en-US&include_adult=false&query=${encodeURIComponent(q)}`);
   return r.results;
 }
 
@@ -605,7 +605,7 @@ export function movieDetails(token: string, id: number): Promise<MovieDetails> {
       release_dates?: ReleaseDates;
       "watch/providers"?: { results?: Record<string, { flatrate?: Prov[]; rent?: Prov[]; buy?: Prov[] }> };
     };
-    const d = await tmdb<D>(token, `movie/${id}?language=pt-PT&append_to_response=release_dates,watch/providers`);
+    const d = await tmdb<D>(token, `movie/${id}?language=en-US&append_to_response=release_dates,watch/providers`);
     const us = d.release_dates?.results?.find((r) => r.iso_3166_1 === "US")?.release_dates ?? [];
     const first = (types: number[]) => us.filter((x) => types.includes(x.type)).map((x) => x.release_date.slice(0, 10)).sort()[0] ?? null;
     const digitalDate = first([4]), physicalDate = first([5]);
